@@ -412,20 +412,25 @@ A simplified structure of this repository:
 ```text
 .
 ├─ src/
-│  ├─ api/           # HTTP/MCP route handlers and controllers
-│  ├─ core/          # Gateway logic, session and permission engine
-│  ├─ mcp/           # MCP client/server abstractions
-│  ├─ services/      # Domain services (logging, events, Vault, etc.)
-│  ├─ db/            # Prisma models and database access
-│  └─ config/        # Configuration and environment loading
+│  ├─ mcp/           # MCP proxy core (core/, services/, controllers/)
+│  ├─ oauth/         # OAuth 2.0 implementation
+│  ├─ socket/        # Socket.IO real-time channel
+│  ├─ security/      # Authentication & authorization helpers
+│  ├─ middleware/    # Express middleware
+│  ├─ repositories/  # Data access layer
+│  ├─ logger/        # Pino logger factory
+│  ├─ config/        # Configuration and environment loading
+│  └─ utils/         # Shared utilities and types
 ├─ docs/
-│  ├─ api/           # Admin API, Socket.IO, and MCP API docs
-│  └─ architecture/  # Diagrams and deeper design notes
+│  ├─ api/                    # Admin API, MCP API, and Socket.IO docs
+│  ├─ DOCKER_DEPLOYMENT.md    # Docker deployment guide
+│  ├─ docker-deploy.sh        # Helper script for Docker deploys
+│  └─ overview.png            # Architecture diagram
 ├─ prisma/           # Prisma schema and migrations
 └─ package.json
 ```
 
-See the `docs/` directory for deeper architecture and API documentation.
+See the `docs/` directory for API references and deployment guides. Architecture notes live in `CLAUDE.md` and the `docs/overview.png` diagram (there is no `docs/architecture/` directory in this repository).
 
 ### Data Flow Description
 
@@ -970,8 +975,8 @@ Test files follow these naming conventions:
 
 ### Current Test Status
 
-* Unit tests exist for core routing and event components.
-* Integration and end‑to‑end tests are being expanded.
+* Automated test coverage is being added; no test files are currently committed.
+* Integration and end‑to‑end scenarios are especially valuable.
 
 Additional test contributions are especially useful for:
 
@@ -1046,4 +1051,3 @@ Subject to the terms of the Elastic License 2.0, you are encouraged to:
 For detailed terms, see the [LICENSE](./LICENSE) file.
 
 Copyright © 2025 [Dunia Labs, Inc.](https://dunialabs.io)
-

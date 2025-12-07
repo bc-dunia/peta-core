@@ -8,7 +8,7 @@ Thank you for considering contributing to Peta MCP Gateway!
 
 If you find a bug or have a feature request, please:
 
-1. Check [Issues](../../issues) to ensure the issue hasn't already been reported
+1. Check [Issues](https://github.com/dunialabs/peta-core/issues) to ensure the issue hasn't already been reported
 2. Create a new Issue with the following information:
    - Clear title and description
    - Steps to reproduce (if applicable)
@@ -38,7 +38,9 @@ If you find a bug or have a feature request, please:
    ```
 
 4. **Make Changes**
-   - Follow existing code style
+   - Follow existing code style (2-space indentation, single quotes)
+   - Use ESM with `.js` extensions on relative imports
+   - Do not hardcode secrets; use environment variables and `.env`
    - Use Pino logger (do not use `console.log`)
    - Update relevant documentation (e.g., README.md, CLAUDE.md)
    - Add tests if necessary
@@ -132,7 +134,7 @@ npm test -- --testPathPattern=YourTest.test.ts
 
 If you discover a security vulnerability, please **do not** create a public Issue. Instead, contact us through:
 
-- Send an email to the project maintainer (yufei@kompas.ai)
+- Send an email to the project team (support@dunialabs.io)
 - Describe the vulnerability details, impact scope, and reproduction steps
 
 We will respond and fix the issue as soon as possible.
