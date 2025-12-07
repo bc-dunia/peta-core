@@ -1,0 +1,207 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "darwin", "darwin-arm64", "linux-musl", "linux-musl-openssl-3.0.x", "windows"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Proxy {
+  id              Int     @id @default(autoincrement()) @map("id")
+  name            String  @map("name") @db.VarChar(128)
+  addtime         Int     @map("addtime")
+  proxyKey        String  @default("") @map("proxy_key") @db.VarChar(255)
+  startPort       Int     @default(3002) @map("start_port")
+  logWebhookUrl   String? @map("log_webhook_url") @db.Text
+  lastSyncedLogId Int     @default(0) @map("last_synced_log_id")
+
+  @@map("proxy")
+}
+
+model User {
+  userId          String  @id @map("user_id") @db.VarChar(64)
+  status          Int     @map("status")
+  role            Int     @map("role")
+  permissions     String  @map("permissions")
+  userPreferences String  @default("") @map("user_preferences")
+  launchConfigs   String  @default("{}") @map("launch_configs")
+  expiresAt       Int     @default(0) @map("expires_at")
+  createdAt       Int     @default(0) @map("created_at")
+  updatedAt       Int     @default(0) @map("updated_at")
+  ratelimit       Int     @map("ratelimit")
+  name            String  @map("name") @db.VarChar(128)
+  encryptedToken  String? @map("encrypted_token")
+  proxyId         Int     @default(0) @map("proxy_id")
+  notes           String? @map("notes")
+
+  @@map("user")
+}
+
+model Server {
+  serverId       String  @id @map("server_id") @db.VarChar(128)
+  serverName     String  @map("server_name") @db.VarChar(128)
+  enabled        Boolean @default(true) @map("enabled")
+  launchConfig   String  @map("launch_config")
+  capabilities   String  @map("capabilities")
+  createdAt      Int     @default(0) @map("created_at")
+  updatedAt      Int     @default(0) @map("updated_at")
+  allowUserInput Boolean @default(false) @map("allow_user_input")
+  configTemplate String? @default("") @map("config_template") @db.Text
+  proxyId        Int     @default(0) @map("proxy_id")
+  toolTmplId     String? @map("tool_tmpl_id") @db.VarChar(128)
+  authType       Int     @default(1) @map("auth_type")
+  category       Int     @default(1) @map("category")
+
+  @@map("server")
+}
+
+model Log {
+  id                      Int     @id @default(autoincrement())
+  createdAt               Int     @default(0) @map("created_at")
+  action                  Int     @default(0)
+  userid                  String  @default("") @db.VarChar
+  serverId                String? @map("server_id") @db.VarChar(128)
+  sessionId               String  @default("") @map("session_id") @db.VarChar
+  upstreamRequestId       String  @default("") @map("upstream_request_id") @db.VarChar
+  uniformRequestId        String? @map("uniform_request_id") @db.VarChar
+  parentUniformRequestId  String? @map("parent_uniform_request_id") @db.VarChar
+  proxyRequestId          String? @map("proxy_request_id") @db.VarChar
+  ip                      String  @default("") @db.VarChar
+  ua                      String  @default("") @db.VarChar
+  tokenMask               String  @default("") @map("token_mask") @db.VarChar
+  requestParams           String  @default("") @map("request_params") @db.Text
+  responseResult          String  @default("") @map("response_result") @db.Text
+  error                   String  @default("") @db.Text
+  duration                Int?    @map("duration")
+  statusCode              Int?    @map("status_code")
+
+  @@index([userid])
+  @@index([sessionId])
+  @@index([uniformRequestId])
+  @@index([serverId])
+  @@index([createdAt])
+  @@map("log")
+}
+
+model Event {
+  id          Int      @id @default(autoincrement())
+  eventId     String   @unique @map("event_id") @db.VarChar(255)
+  streamId    String   @map("stream_id") @db.VarChar(255)
+  sessionId   String   @map("session_id") @db.VarChar(255)
+  messageType String   @map("message_type") @db.VarChar(50)
+  messageData String   @map("message_data")
+  createdAt   DateTime @default(now()) @map("created_at")
+  expiresAt   DateTime @map("expires_at")
+
+  @@index([streamId])
+  @@index([sessionId])
+  @@index([createdAt])
+  @@index([expiresAt])
+  @@map("mcp_events")
+}
+
+model DnsConf {
+  subdomain   String @default("") @map("subdomain") @db.VarChar(128)
+  type        Int    @default(0) @map("type")
+  publicIp    String @default("") @map("public_ip") @db.VarChar(128)
+  id          Int    @id @default(autoincrement())
+  addtime     Int    @default(0) @map("addtime")
+  updateTime  Int    @default(0) @map("update_time")
+  tunnelId    String @default("") @map("tunnel_id") @db.VarChar(256)
+  proxyId     Int    @default(0) @map("proxy_id")
+  createdBy   Int    @default(0) @map("created_by")
+  credentials String @default("") @map("credentials") @db.Text // JSON format: stores complete tunnel credentials
+
+  @@map("dns_conf")
+}
+
+model IpWhitelist {
+  id      Int    @id @default(autoincrement())
+  ip      String @default("") @db.VarChar(128)
+  addtime Int    @default(0) @map("addtime")
+
+  @@map("ip_whitelist")
+}
+
+model License {
+  id          Int    @id @default(autoincrement())
+  licenseStr  String @map("license_str") @db.Text
+  addtime     Int    @map("addtime")
+  status      Int    @map("status") // 100: active, 1: inactive, 2: expired
+
+  @@map("license")
+}
+
+// OAuth 2.0 related models
+
+model OAuthClient {
+  clientId                String   @id @map("client_id") @db.VarChar(255)
+  clientSecret            String?  @map("client_secret") @db.VarChar(255) // Nullable for public clients
+  tokenEndpointAuthMethod String   @default("client_secret_basic") @map("token_endpoint_auth_method") @db.VarChar(50) // 'none' | 'client_secret_basic' | 'client_secret_post'
+  name                    String   @map("name") @db.VarChar(255)
+  redirectUris            Json     @map("redirect_uris") // JSON array of redirect URIs
+  scopes                  Json     @map("scopes") // JSON array of allowed scopes
+  grantTypes              Json     @map("grant_types") // JSON array of allowed grant types
+  responseTypes           Json     @default("[]") @map("response_types") // JSON array of response types
+  userId                  String?  @map("user_id") @db.VarChar(64) // Creator's user ID (optional)
+  trusted                 Boolean  @default(false) @map("trusted") // Skip consent screen if true
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  authorizationCodes OAuthAuthorizationCode[]
+  tokens            OAuthToken[]
+
+  // Indexes for duplicate detection performance
+  @@index([name, tokenEndpointAuthMethod], map: "idx_oauth_client_duplicate_check")
+  @@map("oauth_clients")
+}
+
+model OAuthAuthorizationCode {
+  code          String   @id @map("code") @db.VarChar(255)
+  clientId      String   @map("client_id") @db.VarChar(255)
+  userId        String   @map("user_id") @db.VarChar(64)
+  redirectUri   String   @map("redirect_uri") @db.Text
+  scopes        Json     @map("scopes") // JSON array of granted scopes
+  resource      String?  @map("resource") @db.Text // RFC 8707: Resource Indicators
+  codeChallenge String?  @map("code_challenge") @db.VarChar(255) // PKCE challenge
+  challengeMethod String? @map("challenge_method") @db.VarChar(10) // S256 or plain
+  expiresAt     DateTime @map("expires_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  used          Boolean  @default(false) @map("used") // Prevent code reuse
+
+  // Relations
+  client OAuthClient @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("oauth_authorization_codes")
+}
+
+model OAuthToken {
+  tokenId      String   @id @default(cuid()) @map("token_id")
+  accessToken  String   @unique @map("access_token") @db.Text
+  refreshToken String?  @unique @map("refresh_token") @db.Text
+  clientId     String   @map("client_id") @db.VarChar(255)
+  userId       String   @map("user_id") @db.VarChar(64)
+  scopes       Json     @map("scopes") // JSON array of granted scopes
+  resource     String?  @map("resource") @db.Text // RFC 8707: Resource Indicators
+  accessTokenExpiresAt  DateTime @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  revoked      Boolean  @default(false) @map("revoked") // For token revocation
+
+  // Relations
+  client OAuthClient @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([accessToken])
+  @@index([refreshToken])
+  @@index([accessTokenExpiresAt])
+  @@map("oauth_tokens")
+}

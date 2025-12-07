@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: peta-mcp-gateway-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: peta
+      POSTGRES_PASSWORD: peta123
+      POSTGRES_DB: peta_mcp_gateway
+    ports:
+      - '${PETA_POSTGRES_PORT:-5433}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U peta -d peta_mcp_gateway']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - peta-network
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: peta-mcp-gateway-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+    networks:
+      - peta-network
+    volumes:
+      - ./cloudflared:/etc/cloudflared
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  peta-network:
+    driver: bridge

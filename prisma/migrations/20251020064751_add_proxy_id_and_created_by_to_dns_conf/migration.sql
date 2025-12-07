@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "dns_conf" ADD COLUMN     "created_by" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "proxy_id" INTEGER NOT NULL DEFAULT 0;
