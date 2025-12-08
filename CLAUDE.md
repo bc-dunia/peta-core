@@ -308,6 +308,59 @@ docker logs <container-id>
 docker stop <container-id>
 ```
 
+**Production Deployment:**
+```bash
+# Quick deployment using docker-deploy.sh
+curl -O https://raw.githubusercontent.com/dunialabs/peta-core/main/docs/docker-deploy.sh
+chmod +x docker-deploy.sh
+./docker-deploy.sh
+
+# The script will:
+# 1. Validate Docker environment
+# 2. Generate random secrets (JWT_SECRET, DB password)
+# 3. Create docker-compose.yml and .env
+# 4. Start all services (PostgreSQL, Peta Core, optional Cloudflared)
+# 5. Print connection info and next steps
+```
+
+### PM2 (Production)
+```bash
+# Install dependencies and build
+npm install
+npm run build
+
+# Start with PM2
+pm2 start ecosystem.config.js
+
+# Monitor
+pm2 status
+pm2 logs peta-core
+
+# Restart
+pm2 restart peta-core
+```
+
+**Example ecosystem.config.js:**
+```js
+module.exports = {
+  apps: [
+    {
+      name: 'peta-core',
+      script: './dist/index.js',
+      instances: 2,
+      exec_mode: 'cluster',
+      env: {
+        NODE_ENV: 'production',
+        BACKEND_PORT: 3002,
+      },
+      max_memory_restart: '500M',
+      autorestart: true,
+      watch: false,
+    },
+  ],
+};
+```
+
 ## Key Environment Variables
 
 Required in `.env`:
@@ -320,6 +373,25 @@ Optional:
 - `ENABLE_HTTPS=true` - Enable HTTPS server
 - `SSL_CERT_PATH`, `SSL_KEY_PATH` - Custom certificate paths
 - `SKIP_CLOUDFLARED=true` - Skip Cloudflared setup in dev
+- `LOG_LEVEL` - Log level (trace, debug, info, warn, error, fatal)
+- `LOG_PRETTY` - Pretty-print logs in development
+
+## Health Check
+
+The gateway exposes a health check endpoint for monitoring:
+
+```bash
+# Check if service is running
+curl http://localhost:3002/health
+
+# Returns: 200 OK with health status
+```
+
+Use this endpoint for:
+- Docker health checks
+- Load balancer health probes
+- Monitoring systems (Prometheus, Datadog, etc.)
+- Deployment verification
 
 ## Application Lifecycle
 
@@ -706,3 +778,32 @@ When implementing tests in the future:
 - ❌ Do not create duplicate documents (e.g., `api.md` + `api-v2.md`)
 - ✅ Update existing documents, maintain single source of truth
 - ✅ Search for existing related documents before modifying
+
+## AI Agent Collaboration Guidelines
+
+When working with multiple AI agents (Claude Code, Codex, etc.):
+
+**Claude Code** - Precise, controllable tasks:
+- File search/location (`Glob`, `Grep`)
+- Precise code modifications (`Edit`)
+- Testing/Build/Git operations (`Bash`)
+- Task breakdown (`TodoWrite`)
+- Code review (`Task` agent)
+- Small-scale modifications, variable renaming
+- Running tests, finding code
+
+**Codex** - Complex, large-scale tasks:
+- Large-scale code generation
+- Cross-file refactoring
+- Multi-round reasoning
+- New module development
+- System-level architectural changes
+
+**Workflow:**
+1. Read context: CLAUDE.md (architecture), AGENTS.md (guidelines)
+2. Determine task type → assign to appropriate agent
+3. Execute task
+4. Update knowledge base as needed
+5. Continue to next task
+
+See `.cursorrules` and `PROJECT_COLLABORATION.md` for complete collaboration documentation.
