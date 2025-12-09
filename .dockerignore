@@ -34,7 +34,6 @@ Thumbs.db
 # Documentation
 *.md
 !README.md
-docs/
 
 # Cloudflared credentials
 cloudflared/*.json

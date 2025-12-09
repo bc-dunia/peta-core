@@ -1,4 +1,4 @@
-# Peta Core – MCP Gateway & Runtime for AI Agents
+# Peta Core – MCP Vault & Gateway for AI Agents
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D18-green.svg)
@@ -6,9 +6,9 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)
 
-Peta Core is the operations and permissions layer for AI agents, built on top of Model Context Protocol (MCP).
+Peta Core is the operations and permissions layer for AI agents, built on top of Model Context Protocol (MCP). Think of it as 1Password for AI agents: an MCP vault and gateway that keeps secrets server-side, issues short-lived agent tokens, and enforces access policies and human approvals.
 
-It runs as a zero‑trust gateway and managed runtime in front of your MCP servers: every request from an agent is authenticated, evaluated against policy, executed with server‑side credentials, and written to an audit log.
+It runs as a zero‑trust gateway and managed runtime in front of your MCP servers: every request from an agent is authenticated, evaluated against policy, executed with server‑side credentialsfrom the MCP vault, and written to an audit log.
 
 Use Peta Core to connect ChatGPT, Claude, Cursor, n8n or other MCP‑compatible clients (AI agents) to your internal tools, APIs, and data sources without exposing raw secrets to agents. The gateway centralizes authentication, authorization, rate limiting, and observability for every MCP server.
 
@@ -100,7 +100,7 @@ Peta Core centralizes these concerns into a single gateway:
 
 Peta Core is the core backend service of the Peta MCP stack. In typical deployments it runs together with two companion applications:
 
-- **Peta Core** – this repository; the MCP gateway and runtime.
+- **Peta Core** – this repository; the MCP vault,  gateway and runtime.
 - **Peta Console** – a web control plane used by administrators to configure policies, manage MCP servers, and inspect audit logs.
 - **Peta Desk** – a desktop client that combines an MCP client with a real‑time control surface, so end users can approve operations and manage their own configuration.
 
@@ -111,7 +111,7 @@ At a high level Peta Core is responsible for:
 - Terminating MCP connections from agents and MCP‑compatible clients.
 - Issuing and validating short‑lived Peta service tokens.
 - Routing and scaling downstream MCP servers on demand.
-- Injecting external credentials from an encrypted vault at execution time.
+- Injecting external credentials from an encrypted MCP vault at execution time.
 - Enforcing per‑user, per‑agent, and per‑tool policy decisions.
 - Persisting events for reconnection and audit.
 - Providing observability hooks for logs and metrics.
@@ -129,7 +129,7 @@ Peta Core sits between MCP clients and downstream MCP servers and provides:
   Policy rules can mark specific tools as approval‑required. When an agent calls such a tool, execution is paused and an approval request is sent to Peta Desk (or another UI) so a human can approve or reject the call.
 
 - **Zero‑trust credential handling**  
-  Agents receive only short‑lived Peta service tokens. Real API keys and other secrets stay in an encrypted store and are injected into downstream MCP servers only on the server side when a tool runs.
+  Agents receive only short‑lived Peta service tokens. Real API keys and other secrets stay in an encrypted MCP vault and are injected into downstream MCP servers only on the server side when a tool runs.
 
 - **Authentication & identity**  
   JWT‑based identity for humans and agents, plus OAuth 2.0 flows for obtaining access tokens. Supports multi‑tenant deployments where multiple workspaces share a single gateway.
@@ -176,7 +176,7 @@ Between those two sides the gateway adds:
 
 - Authentication and session management.
 - Permission evaluation (including human‑in‑the‑loop checks).
-- Credential injection from encrypted storage.
+- Credential injection from encrypted storage (the MCP vault).
 - Rate limiting and IP filtering.
 - Event persistence and reconnection support.
 - Logging and audit trails.
