@@ -20,6 +20,7 @@ export enum ServerType {
 export enum ServerCategory {
   Template = 1,       // template server
   CustomRemote = 2,   // custom remote server
+  RestApi = 3,        // RESTful API server
 }
 
 export enum ServerAuthType {
