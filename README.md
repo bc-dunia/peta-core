@@ -10,7 +10,9 @@ Peta Core is the operations and permissions layer for AI agents, built on top of
 
 It runs as a zero‑trust gateway and managed runtime in front of your MCP servers: every request from an agent is authenticated, evaluated against policy, executed with server‑side credentialsfrom the MCP vault, and written to an audit log.
 
-Use Peta Core to connect ChatGPT, Claude, Cursor, n8n or other MCP‑compatible clients (AI agents) to your internal tools, APIs, and data sources without exposing raw secrets to agents. The gateway centralizes authentication, authorization, rate limiting, and observability for every MCP server.
+Use Peta Core to connect ChatGPT, Claude, Cursor, n8n or other MCP‑compatible clients (AI agents) to your internal tools, APIs, and data sources without exposing raw secrets to agents. The gateway centralizes authentication, authorization, rate limiting, and observability for every MCP server. 
+
+Credentials for downstream tools and services are stored in a server-side vault, encrypted at rest with a modern scheme based on PBKDF2 key derivation and AES-GCM authenticated encryption, and are never embedded into agent prompts, long-lived configs, or client tokens.
 
 
 📘 **Full Documentation** → [https://docs.peta.io](https://docs.peta.io)
@@ -128,8 +130,10 @@ Peta Core sits between MCP clients and downstream MCP servers and provides:
 - **Human‑in‑the‑loop approvals**  
   Policy rules can mark specific tools as approval‑required. When an agent calls such a tool, execution is paused and an approval request is sent to Peta Desk (or another UI) so a human can approve or reject the call.
 
-- **Zero‑trust credential handling**  
-  Agents receive only short‑lived Peta service tokens. Real API keys and other secrets stay in an encrypted MCP vault and are injected into downstream MCP servers only on the server side when a tool runs.
+- **Zero-trust credential handling**  
+  Agents receive only short-lived Peta agent tokens; real API keys and other secrets stay in the server-side MCP vault and are injected into downstream MCP servers only at runtime. Secret values are encrypted at rest using AES-GCM, with the encryption key derived via PBKDF2 from an operator-managed secret plus a per-record random salt, so compromising the database alone is not enough to recover credentials.
+  
+- * **Local credential vault with a master key** – access tokens and per-user credentials are encrypted with a key derived from a user-chosen master password (PBKDF2 + AES-GCM); plaintext secrets never hit disk and never leave the device.
 
 - **Authentication & identity**  
   JWT‑based identity for humans and agents, plus OAuth 2.0 flows for obtaining access tokens. Supports multi‑tenant deployments where multiple workspaces share a single gateway.
@@ -153,7 +157,7 @@ Peta Core sits between MCP clients and downstream MCP servers and provides:
   Users can configure certain MCP servers that require per‑user input (for example, API keys) via Peta Desk without touching the gateway’s global configuration.
 
 - **Observability and audit**  
-  Structured logs (for example using Pino) and database‑backed audit records capture who called which tool, with which parameters, and when.
+  Structured logs (for example using Pino) and database-backed audit records capture who called which tool, with which parameters, and when, without logging raw secrets or vault key material.
 
 
 ---
@@ -196,6 +200,36 @@ Typical responsibilities inside the gateway include:
 
 ---
 
+## Vault Encryption Model
+
+Peta Core is designed for environments where secret material and control must stay inside your own infrastructure. The MCP vault in Core uses a password-based key derivation + authenticated encryption scheme:
+
+### Key derivation (PBKDF2)
+
+- Encryption keys are derived from an operator-managed secret using PBKDF2 (HMAC-SHA-256) with a per-record random salt.
+- The salt is at least 128 bits of randomness and is stored alongside the ciphertext.
+- A high iteration count (on the order of 100k+ iterations) is used to make brute-force attempts significantly more expensive.
+- The result is a 256-bit key suitable for AES-256-GCM.
+
+### Authenticated encryption (AES-GCM)
+
+- Secret values are encrypted with AES-256-GCM using a fresh IV/nonce for each encryption operation.
+- AES-GCM produces both ciphertext and a 16-byte authentication tag.
+- On decryption, the authentication tag is verified; if any part of the stored data has been modified, decryption fails and the value is rejected.
+
+### What is stored at rest
+
+For each encrypted secret, the database only stores:
+
+- `salt` (for PBKDF2)
+- `iv` / `nonce` (for AES-GCM)
+- `ciphertext`
+- `authTag`
+
+The operator secret and the derived AES keys never leave process memory and are not written to disk. In production, the operator secret should be provisioned from your existing secret manager or KMS (see `.env.example` for configuration details).
+
+---
+
 ## Companion Applications
 
 Peta Core is usually deployed together with two companion applications.
@@ -214,6 +248,11 @@ Peta Console is a web‑based administration UI for operators and security teams
   - Enable or disable accounts.
   - Assign roles and permissions.
   - Configure per‑user rate limits.
+
+- **Credential security**
+  - Store per-user tokens and credentials encrypted locally with a master password chosen by the user.
+  - Optionally unlock the local vault with platform biometrics (Touch ID / Windows Hello) instead of retyping the password.
+  - The master key never leaves the device and is never sent to Peta Core; only encrypted blobs are stored on disk.
 
 - **MCP server management**
   - Register and configure downstream MCP servers.
@@ -697,6 +736,8 @@ All configuration is set via environment variables (for example in a `.env` file
 | `JWT_SECRET` | ✓ (in production) | –       | Secret used to sign and verify Peta service tokens. |
 
 OAuth 2.0 and multi‑tenant settings are also configured via environment variables; refer to `.env.example` and the API docs for the full list.
+
+> For production deployments, treat `JWT_SECRET` and any vault-encryption related secrets as high-value keys: provision them from your secret manager or KMS, never check them into source control, and rotate them according to your organization’s security policies.
 
 **Logging**
 
