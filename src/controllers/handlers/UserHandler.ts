@@ -147,7 +147,23 @@ export class UserHandler {
       where.role = { not: excludeRole };
     }
 
-    const users = await prisma.user.findMany({ where });
+    const users = await prisma.user.findMany({
+      where,
+      select: {
+        userId: true,
+        status: true,
+        role: true,
+        permissions: true,
+        expiresAt: true,
+        createdAt: true,
+        updatedAt: true,
+        ratelimit: true,
+        name: true,
+        encryptedToken: true,
+        proxyId: true,
+        notes: true,
+      }
+    });
     return { users: users };
   }
 
