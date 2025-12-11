@@ -256,7 +256,7 @@ export class ServerHandler {
         AdminErrorCode.INVALID_REQUEST
       );
     }
-    if (configTemplate !== undefined) {
+    if (existingServer.category !== ServerCategory.RestApi && configTemplate !== undefined) {
       throw new AdminError(
         'configTemplate field is immutable after server creation',
         AdminErrorCode.INVALID_REQUEST
@@ -268,6 +268,9 @@ export class ServerHandler {
     if (serverName !== undefined) updateData.serverName = serverName;
     if (launchConfig !== undefined) {
       updateData.launchConfig = typeof launchConfig === 'string' ? launchConfig : JSON.stringify(launchConfig);
+    }
+    if (existingServer.category === ServerCategory.RestApi && configTemplate !== undefined) {
+      updateData.configTemplate = configTemplate;
     }
 
     const updatedCapabilities = await this.getUpdatedCapabilities(capabilities, existingServer.capabilities);
@@ -550,14 +553,21 @@ export class ServerHandler {
       throw new AdminError(`Server ${targetId} is a template server and cannot be updated`, AdminErrorCode.INVALID_REQUEST);
     }
 
+    let serverContext = this.serverManager.getServerContext(targetId);
+
     const oldLaunchConfig = entity.launchConfig;
     if (launchConfig === oldLaunchConfig) {
-      return;
+      if (entity.category !== ServerCategory.RestApi) {
+        return;
+      }
+      
+      if (entity.configTemplate === serverContext?.serverEntity.configTemplate) {
+        return;
+      }
     }
 
     const newServer = await ServerRepository.updateLaunchConfig(targetId, launchConfig);
 
-    let serverContext = this.serverManager.getServerContext(targetId);
     if (!serverContext) {
       return;
     }
