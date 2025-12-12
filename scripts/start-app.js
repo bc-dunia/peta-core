@@ -278,39 +278,89 @@ async function startApplication() {
     // Monitor output to detect successful startup
     let startupDetected = false;
 
+    // Note: many tools (including concurrently / tsx) may write startup logs to stderr.
+    // Also, 'data' events can split lines, so we do line buffering for reliable detection.
+    const stripAnsi = (str) => str.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
+    const startupPortRegex = new RegExp(`\\b(port|ports?)\\b[^\\n]*\\b${backendPort}\\b`, 'i');
+    const startupListenRegex = new RegExp(`\\blisten(ing)?\\b[^\\n]*\\b${backendPort}\\b`, 'i');
+
+    const isStartupIndicator = (line) => {
+      const normalized = stripAnsi(line).replace(/\r/g, '').toLowerCase();
+      return (
+        normalized.includes('server ready') ||
+        normalized.includes(`http://localhost:${backendPort}`) ||
+        normalized.includes(`https://localhost:${backendPort}`) ||
+        normalized.includes(`http://127.0.0.1:${backendPort}`) ||
+        normalized.includes(`https://127.0.0.1:${backendPort}`) ||
+        startupPortRegex.test(normalized) ||
+        startupListenRegex.test(normalized)
+      );
+    };
+
+    let bufferedStdout = '';
+    let bufferedStderr = '';
+    let stdoutRemainder = '';
+    let stderrRemainder = '';
+
+    const flushBufferedOutput = () => {
+      if (bufferedStdout) {
+        process.stdout.write(bufferedStdout);
+        bufferedStdout = '';
+      }
+      if (bufferedStderr) {
+        process.stderr.write(bufferedStderr);
+        bufferedStderr = '';
+      }
+    };
+
+    const onStartupDetected = () => {
+      if (startupDetected) return;
+      startupDetected = true;
+      spinner.stop();
+      logSuccess(`Services ready on :${backendPort}`);
+      logInfo(`Dashboard: ${chalk.blue.underline(`http://localhost:${backendPort}`)}`);
+      console.log();
+      console.log(chalk.green.bold('  🚀 peta-core is ready!'));
+      console.log();
+      flushBufferedOutput();
+    };
+
+    const handleOutput = (data, isStderr) => {
+      const output = data.toString();
+
+      // Buffer everything until we either detect startup or hit the fallback timer,
+      // then flush once and start streaming live output.
+      if (!startupDetected) {
+        if (isStderr) bufferedStderr += output;
+        else bufferedStdout += output;
+      } else {
+        if (isStderr) process.stderr.write(output);
+        else process.stdout.write(output);
+      }
+
+      // Detection (line-buffered) on BOTH streams
+      const combined = (isStderr ? stderrRemainder : stdoutRemainder) + output;
+      const lines = combined.split(/\n/);
+      const remainder = lines.pop() ?? '';
+      if (isStderr) stderrRemainder = remainder;
+      else stdoutRemainder = remainder;
+
+      if (!startupDetected) {
+        for (const line of lines) {
+          if (isStartupIndicator(line)) {
+            onStartupDetected();
+            break;
+          }
+        }
+      }
+    };
+
     if (child.stdout) {
-      child.stdout.on('data', (data) => {
-        const output = data.toString();
-
-        // Look for server startup indicators
-        if (!startupDetected && (
-          output.includes('Server ready') ||
-          output.includes('listening on') ||
-          output.includes(`http://localhost:${backendPort}`) ||
-          output.includes(`PORT ${backendPort}`)
-        )) {
-          startupDetected = true;
-          spinner.stop();
-          logSuccess(`Services ready on :${backendPort}`);
-          logInfo(`Dashboard: ${chalk.blue.underline(`http://localhost:${backendPort}`)}`);
-          console.log();
-          console.log(chalk.green.bold('  🚀 peta-core is ready!'));
-          console.log();
-        }
-
-        // Print output after spinner stops
-        if (startupDetected) {
-          process.stdout.write(output);
-        }
-      });
+      child.stdout.on('data', (data) => handleOutput(data, false));
     }
 
     if (child.stderr) {
-      child.stderr.on('data', (data) => {
-        if (startupDetected) {
-          process.stderr.write(data);
-        }
-      });
+      child.stderr.on('data', (data) => handleOutput(data, true));
     }
 
     // Fallback: stop spinner after 10 seconds if no startup detected
@@ -320,8 +370,9 @@ async function startApplication() {
         logInfo('Services starting...');
         console.log();
 
-        // Start forwarding all output
+        // Start forwarding all output (and flush anything buffered so far)
         startupDetected = true;
+        flushBufferedOutput();
       }
     }, 10000);
 
