@@ -3,7 +3,7 @@ import { ServerRepository } from '../../repositories/ServerRepository.js';
 import { UserRepository } from '../../repositories/UserRepository.js';
 import { DownstreamTransportFactory } from './DownstreamTransportFactory.js';
 import { Client, ClientOptions } from "@modelcontextprotocol/sdk/client/index.js";
-import { ServerAuthType, ServerStatus } from '../../types/enums.js';
+import { ServerAuthType, ServerCategory, ServerStatus } from '../../types/enums.js';
 import { Permissions, ServerConfigCapabilities } from '../types/mcp.js';
 import { CryptoService } from '../../security/CryptoService.js';
 import { AuthStrategyFactory } from '../auth/AuthStrategyFactory.js';
@@ -316,6 +316,19 @@ export class ServerManager {
 
       // 2. Initialize authentication (handle OAuth token)
       await this.initializeAuthentication(serverContext, launchConfig, token);
+
+      if (serverEntity.category === ServerCategory.RestApi) {
+        if (!serverEntity.configTemplate || serverEntity.configTemplate.trim() === '' || serverEntity.configTemplate.trim() === '{}') {
+          throw new Error(`[ServerManager] Missing configTemplate for server ${serverEntity.serverId}`);
+        }
+        const config = JSON.parse(serverEntity.configTemplate);
+        config.apis[0].auth = launchConfig.auth;
+        delete launchConfig.auth;
+        launchConfig.env ??= {
+          type: "none"
+        };
+        launchConfig.env.GATEWAY_CONFIG = JSON.stringify(config);
+      }
 
       // 4. Create transport using dynamic transport factory
       const transport = await DownstreamTransportFactory.create(launchConfig);

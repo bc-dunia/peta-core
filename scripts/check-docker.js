@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { execSync } = require('child_process');
+import { execSync } from 'child_process';
 
 function checkDocker() {
   try {
@@ -33,9 +33,9 @@ function checkDocker() {
   }
 }
 
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   const isDockerReady = checkDocker();
   process.exit(isDockerReady ? 0 : 1);
 }
 
-module.exports = { checkDocker };
+export { checkDocker };

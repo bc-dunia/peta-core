@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const net = require('net');
+import net from 'net';
 
 /**
  * Check if port is available
@@ -38,7 +38,7 @@ async function findAvailablePort(startPort = 3002, maxPort = 3020, excludePorts 
  * Allocate available port for backend
  */
 async function allocatePorts() {
-  console.log('🔍 Checking for available ports...');
+  // console.log('🔍 Checking for available ports...');
 
   try {
     // First check if BACKEND_PORT is configured in .env
@@ -57,15 +57,12 @@ async function allocatePorts() {
       backendPort = await findAvailablePort(3002, 3020);
       console.log(`🚀 Backend will use port ${backendPort}`);
     } else {
-      const portSource = configuredPort ? 'configured' : 'default';
-      console.log(`✅ Backend will use ${portSource} port ${backendPort}`);
+      // const portSource = configuredPort ? 'configured' : 'default';
+      // console.log(`✅ Backend will use ${portSource} port ${backendPort}`);
     }
 
     // Set environment variable
     process.env.BACKEND_PORT = String(backendPort);
-
-    console.log(`📋 Port allocation complete:`);
-    console.log(`   Backend:  http://localhost:${backendPort}`);
 
     return { backendPort };
 
@@ -77,13 +74,13 @@ async function allocatePorts() {
 
 
 // If this script is executed directly
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   allocatePorts().then(ports => {
     console.log('Port allocated:', ports);
   }).catch(console.error);
 }
 
-module.exports = {
+export {
   isPortAvailable,
   findAvailablePort,
   allocatePorts

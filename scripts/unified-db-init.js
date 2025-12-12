@@ -11,9 +11,13 @@
  * - Silent operation for better user experience
  */
 
-const { execSync } = require('child_process');
-const path = require('path');
-const fs = require('fs');
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import fs from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Configuration
 const MAX_RETRIES = 30;
@@ -106,9 +110,8 @@ function isRunningInContainer() {
   if (process.env.SKIP_DB_CONTAINER_START === 'true') {
     return true;
   }
-  
+
   // Check if /.dockerenv exists (Docker container indicator)
-  const fs = require('fs');
   try {
     if (fs.existsSync('/.dockerenv')) {
       return true;
@@ -116,7 +119,7 @@ function isRunningInContainer() {
   } catch (error) {
     // Ignore errors
   }
-  
+
   // Check if cgroup contains docker
   try {
     const cgroup = fs.readFileSync('/proc/self/cgroup', 'utf8');
@@ -126,7 +129,7 @@ function isRunningInContainer() {
   } catch (error) {
     // Ignore errors
   }
-  
+
   return false;
 }
 
