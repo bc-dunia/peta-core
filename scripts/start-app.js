@@ -93,16 +93,17 @@ function getVersion() {
 function printBanner() {
   const VERSION = getVersion();
   const envLabel = NODE_ENV.toUpperCase();
+  const orange = chalk.rgb(245, 103, 17);
 
   const banner = `
 ${chalk.cyan('┌─')} ${chalk.bold.white('peta-core')} ${chalk.dim(`v${VERSION}`)} ${chalk.cyan('────────────────────────────────────────────────────────────┐')}
 ${chalk.cyan('│')}                                                                               ${chalk.cyan('│')}
-${chalk.cyan('│')}   ${chalk.magenta('██████╗ ███████╗████████╗ █████╗')}                                            ${chalk.cyan('│')}
-${chalk.cyan('│')}   ${chalk.magenta('██╔══██╗██╔════╝╚══██╔══╝██╔══██╗')}    ${chalk.white('Zero-Trust Gateway for AI Agents')}       ${chalk.cyan('│')}
-${chalk.cyan('│')}   ${chalk.magenta('██████╔╝█████╗     ██║   ███████║')}                                           ${chalk.cyan('│')}
-${chalk.cyan('│')}   ${chalk.magenta('██╔═══╝ ██╔══╝     ██║   ██╔══██║')}    ${chalk.blue.underline('https://peta.io')}                        ${chalk.cyan('│')}
-${chalk.cyan('│')}   ${chalk.magenta('██║     ███████╗   ██║   ██║  ██║')}    ${chalk.dim('Docs:')} ${chalk.blue.underline('https://docs.peta.io')}             ${chalk.cyan('│')}
-${chalk.cyan('│')}   ${chalk.magenta('╚═╝     ╚══════╝   ╚═╝   ╚═╝  ╚═╝')}    ${chalk.dim('GitHub:')} ${chalk.blue.underline('github.com/dunialabs/peta-core')} ${chalk.cyan('│')}
+${chalk.cyan('│')}   ${orange('██████╗ ███████╗████████╗ █████╗')}                                            ${chalk.cyan('│')}
+${chalk.cyan('│')}   ${orange('██╔══██╗██╔════╝╚══██╔══╝██╔══██╗')}    ${chalk.white('Zero-Trust Gateway for AI Agents')}       ${chalk.cyan('│')}
+${chalk.cyan('│')}   ${orange('██████╔╝█████╗     ██║   ███████║')}                                           ${chalk.cyan('│')}
+${chalk.cyan('│')}   ${orange('██╔═══╝ ██╔══╝     ██║   ██╔══██║')}    ${chalk.blue.underline('https://peta.io')}                        ${chalk.cyan('│')}
+${chalk.cyan('│')}   ${orange('██║     ███████╗   ██║   ██║  ██║')}    ${chalk.dim('Docs:')} ${chalk.blue.underline('https://docs.peta.io')}             ${chalk.cyan('│')}
+${chalk.cyan('│')}   ${orange('╚═╝     ╚══════╝   ╚═╝   ╚═╝  ╚═╝')}    ${chalk.dim('GitHub:')} ${chalk.blue.underline('github.com/dunialabs/peta-core')} ${chalk.cyan('│')}
 ${chalk.cyan('│')}                                                                               ${chalk.cyan('│')}
 ${chalk.cyan('│')}   ${chalk.dim('Dunia Labs, Inc.')}                         ${chalk.dim(`[${envLabel.padEnd(11)}]`)} ${chalk.gray('Press Ctrl+C to stop')} ${chalk.cyan('│')}
 ${chalk.cyan('└───────────────────────────────────────────────────────────────────────────────┘')}
