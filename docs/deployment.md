@@ -1,0 +1,220 @@
+# Deployment
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js **v18+**
+- npm
+- Docker and Docker Compose (for PostgreSQL and optional Cloudflare DDNS)
+
+### Local Development
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Start the full development environment (gateway + local database):
+
+```bash
+npm run dev
+```
+
+Start only the backend (if you already have PostgreSQL running):
+
+```bash
+npm run dev:backend-only
+```
+
+Database helper commands:
+
+```bash
+npm run db:start   # Start PostgreSQL via Docker
+npm run db:init    # Run migrations and generate Prisma client
+npm run db:studio  # Open Prisma Studio
+npm run db:reset   # Reset database (destructive)
+npm run db:stop    # Stop database services
+```
+
+Build for production:
+
+```bash
+npm run build
+```
+
+To skip Cloudflared in development, set:
+
+```bash
+SKIP_CLOUDFLARED=true npm run dev
+```
+
+### Production with Docker
+
+Peta Core ships with a shell script that prepares a Docker-based deployment:
+
+```bash
+curl -O https://raw.githubusercontent.com/dunialabs/peta-core/main/docs/docker-deploy.sh
+chmod +x docker-deploy.sh
+./docker-deploy.sh
+```
+
+The script will:
+
+1. Validate your Docker environment.
+2. Generate random secrets (for example `JWT_SECRET` and a database password).
+3. Create a `docker-compose.yml` and `.env` file.
+4. Start all services (PostgreSQL, Peta Core, and optional Cloudflared DDNS).
+5. Wait for basic health checks.
+6. Print connection information and next steps.
+
+You can also adapt the generated files to your own Docker or orchestration setup.
+
+### Production with Node.js/PM2
+
+To run Peta Core directly on Node.js with an existing PostgreSQL database:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/dunialabs/peta-core.git
+cd peta-core
+
+# 2. Install dependencies
+npm install
+
+# 3. Configure environment
+cp .env.example .env
+# Edit .env and set required values such as DATABASE_URL and JWT_SECRET
+
+# 4. Build
+npm run build
+
+# 5. Start the service
+npm start
+```
+
+For process management in production you can use PM2 with an `ecosystem.config.js` like the following:
+
+```js
+module.exports = {
+  apps: [
+    {
+      name: 'peta-core',
+      script: './dist/index.js',
+      instances: 2,
+      exec_mode: 'cluster',
+      env: {
+        NODE_ENV: 'production',
+        BACKEND_PORT: 3002,
+      },
+      max_memory_restart: '500M',
+      autorestart: true,
+      watch: false,
+    },
+  ],
+};
+```
+
+Then start Peta Core with:
+
+```bash
+pm2 start ecosystem.config.js
+```
+
+---
+
+## Configuration
+
+All configuration is set via environment variables (for example in a `.env` file).
+
+### Key Environment Variables
+
+#### Database
+
+| Name           | Required | Default | Description                                                                                                      |
+| -------------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL` | ✓        | –       | PostgreSQL connection string, for example `postgresql://user:password@host:5432/peta_mcp_gateway?schema=public`. |
+
+#### Server
+
+| Name            | Required | Default | Description                                               |
+| --------------- | -------- | ------- | --------------------------------------------------------- |
+| `BACKEND_PORT`  |          | `3002`  | HTTP port that the gateway listens on.                    |
+| `ENABLE_HTTPS`  |          | `false` | Enable HTTPS termination in the Node.js process.          |
+| `SSL_CERT_PATH` |          | –       | Path to TLS certificate, required if `ENABLE_HTTPS=true`. |
+| `SSL_KEY_PATH`  |          | –       | Path to TLS private key, required if `ENABLE_HTTPS=true`. |
+
+#### Authentication
+
+| Name         | Required          | Default | Description                                         |
+| ------------ | ----------------- | ------- | --------------------------------------------------- |
+| `JWT_SECRET` | ✓ (in production) | –       | Secret used to sign and verify Peta service tokens. |
+
+OAuth 2.0 and multi-tenant settings are also configured via environment variables; refer to `../.env.example` and the API docs for the full list.
+
+> For production deployments, treat `JWT_SECRET` and any vault-encryption related secrets as high-value keys: provision them from your secret manager or KMS, never check them into source control, and rotate them according to your organization’s security policies.
+
+#### Logging
+
+| Name         | Required | Default                      | Description                                           |
+| ------------ | -------- | ---------------------------- | ----------------------------------------------------- |
+| `LOG_LEVEL`  |          | `trace` (dev), `info` (prod) | Log level: `trace`, `debug`, `info`, `warn`, `error`. |
+| `LOG_PRETTY` |          | `true` (dev), `false` (prod) | Enable pretty-printed logs in development.            |
+
+#### Cloudflared DDNS (optional)
+
+| Name               | Required | Default | Description                                         |
+| ------------------ | -------- | ------- | --------------------------------------------------- |
+| `SKIP_CLOUDFLARED` |          | `false` | Skip Cloudflared setup in development environments. |
+
+For additional environment variables (for example OAuth clients, multi-tenant configuration, or external services), see `../.env.example` and the deployment documentation.
+
+---
+
+## Docker Configuration
+
+The default Docker setup uses the following containers and settings.
+
+### PostgreSQL
+
+- Container name: `peta-mcp-gateway-postgres`
+- Port: `5432`
+- Database name: `peta_mcp_gateway`
+- User/password: `peta` / `peta123` (⚠️ change these in production)
+
+### Cloudflared DDNS (optional)
+
+- Container name: `peta-mcp-gateway-cloudflared`
+- Configuration directory: `./cloudflared`
+
+These values come from the default Docker compose files and can be adjusted to match your environment.
+
+---
+
+## Available Commands
+
+**Development**
+
+```bash
+npm run dev              # Watch and run gateway + dev stack
+npm run dev:backend-only # Gateway only (use your own DB)
+npm run build            # Compile TypeScript to ./dist
+npm run rebuild          # Clean and rebuild
+```
+
+**Database**
+
+```bash
+npm run db:start    # Start PostgreSQL in Docker
+npm run db:init     # Apply migrations and generate the Prisma client
+npm run db:studio   # Open Prisma Studio
+npm run db:reset    # Reset database (destructive)
+npm run db:logs     # View database container logs (if available)
+npm run db:restart  # Restart database containers (if available)
+npm run db:stop     # Stop database containers
+```
+
+See `../package.json` for the full list of scripts.
+
+---
