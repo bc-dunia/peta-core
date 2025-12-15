@@ -53,7 +53,7 @@ The image includes the following components:
 
 When the container starts, it executes in the following order:
 
-1. Run database initialization script (`scripts/unified-db-init.cjs`)
+1. Run database initialization script (`scripts/unified-db-init.js`)
    - Generate Prisma Client
    - Run database migrations
 2. Start MCP Gateway service (`dist/index.js`)

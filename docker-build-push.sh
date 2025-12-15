@@ -23,7 +23,7 @@ readonly PUSH_TIMEOUT=300   # 5 minutes
 # Docker Hub
 readonly DOCKER_HUB_REPO="petaio/peta-core"
 
-# ANSI Colors (matching project style from start-app.cjs)
+# ANSI Colors (matching project style from start-app.js)
 readonly RESET='\033[0m'
 readonly BRIGHT='\033[1m'
 readonly GREEN='\033[32m'
@@ -625,7 +625,7 @@ function main() {
   echo -e "${BRIGHT}${BLUE}"
   cat << 'BANNER'
 ╔═══════════════════════════════════════════════════╗
-║   Peta Core - Multi-Arch Docker Build      ║
+║   Peta Core - Multi-Arch Docker Build             ║
 ╚═══════════════════════════════════════════════════╝
 BANNER
   echo -e "${RESET}"

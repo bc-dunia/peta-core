@@ -720,7 +720,7 @@ When implementing tests in the future:
 
 - `src/index.ts` - Main application entry point
 - `scripts/start-with-ports.cjs` - Dev startup script (finds available ports)
-- `scripts/unified-db-init.cjs` - Database initialization
+- `scripts/unified-db-init.js` - Database initialization
 
 ## Additional Documentation
 

@@ -73,4 +73,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:3002/health || exit 1
 
 # Startup command
-CMD ["sh", "-c", "node scripts/unified-db-init.cjs && node dist/index.js"]
+CMD ["sh", "-c", "node scripts/unified-db-init.js && node dist/index.js"]
