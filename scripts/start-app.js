@@ -318,7 +318,7 @@ async function startApplication() {
       startupDetected = true;
       spinner.stop();
       logSuccess(`Services ready on :${backendPort}`);
-      logInfo(`Dashboard: ${chalk.blue.underline(`http://localhost:${backendPort}`)}`);
+      logInfo(`Service URL: ${chalk.blue.underline(`http://localhost:${backendPort}`)}`);
       console.log();
       console.log(chalk.green.bold('  🚀 peta-core is ready!'));
       console.log();

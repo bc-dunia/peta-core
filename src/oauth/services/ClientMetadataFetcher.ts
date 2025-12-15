@@ -115,7 +115,7 @@ export class ClientMetadataFetcher {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
-          'User-Agent': 'Peta-MCP-Gateway/1.0'
+          'User-Agent': 'peta-core/1.0'
         },
         signal: controller.signal
       });

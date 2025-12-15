@@ -130,8 +130,8 @@ export class ProxySession {
     // Initialize MCP Server instance
     this.upstreamServer = new Server(
       { 
-        name: APP_INFO.name, 
-        version: APP_INFO.version 
+        name: APP_INFO.name,
+        version: APP_INFO.version
       },
       {
         capabilities: {

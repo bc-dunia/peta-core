@@ -1,8 +1,8 @@
 {
-  "name": "peta-mcp-gateway",
+  "name": "peta-core",
   "version": "1.0.0",
   "type": "module",
-  "description": "Peta MCP Gateway - Backend service for MCP protocol",
+  "description": "Peta Core - Backend service for MCP protocol",
   "main": "dist/index.js",
   "scripts": {
     "dev": "NODE_ENV=development node scripts/start-app.js",

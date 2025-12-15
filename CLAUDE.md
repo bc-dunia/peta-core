@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Peta MCP Gateway is a standalone backend service that implements a transparent proxy for the Model Context Protocol (MCP). It acts as an intelligent intermediary between MCP clients (like Claude Desktop) and downstream MCP servers, providing authentication, rate limiting, session management, event persistence, and OAuth 2.0 support.
+Peta Core is a standalone backend service that implements a transparent proxy for the Model Context Protocol (MCP). It acts as an intelligent intermediary between MCP clients (like Claude Desktop) and downstream MCP servers, providing authentication, rate limiting, session management, event persistence, and OAuth 2.0 support.
 
 ## Core Architecture
 
 ### Socket.IO Real-time Communication
 
-Peta MCP Gateway includes a Socket.IO server for bidirectional real-time communication between the server and Electron clients. This is **independent** from the MCP SSE (Server-Sent Events) mechanism.
+Peta Core includes a Socket.IO server for bidirectional real-time communication between the server and Electron clients. This is **independent** from the MCP SSE (Server-Sent Events) mechanism.
 
 **Key Features:**
 - Token-based authentication (reuses existing `TokenValidator`)
@@ -573,9 +573,10 @@ Configuration is distributed across multiple files:
 - **`src/config/config.ts`** - App metadata from package.json (APP_INFO)
 - **`src/config/auth.config.ts`** - Token expiration, cookie settings
 - **`src/config/mcpSessionConfig.ts`** - MCP protocol version, timeouts
-- **`src/config/eventStoreConfig.ts`** - Event retention (7 days), cache sizes
 - **`src/config/reverseRequestConfig.ts`** - Reverse request timeouts (30s)
 - **`.env`** - Runtime environment variables (DATABASE_URL, ports, SSL)
+
+Note: EventStore configuration (cache sizes, retention) is hardcoded in `PersistentEventStore` class.
 
 ### 8. Repository Pattern
 

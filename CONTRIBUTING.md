@@ -1,6 +1,6 @@
 # Contributing Guide
 
-Thank you for considering contributing to Peta MCP Gateway!
+Thank you for considering contributing to Peta Core!
 
 ## How to Contribute
 

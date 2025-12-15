@@ -63,7 +63,7 @@ export function getShutdownFunction(): ((signal: string) => Promise<void>) | nul
  * Initialize authentication and session management module
  */
 export async function initializeAuthModule() {
-  appLogger.info('Initializing Peta MCP Gateway auth module...');
+  appLogger.info('Initializing Peta Core auth module...');
 
   // 1. Initialize data access layer
   const logService = LogService.getInstance();
@@ -374,7 +374,7 @@ export async function startApplication() {
     // Root path handler - returns basic service information
     app.get('/', (req, res) => {
       res.json({
-        service: 'Peta MCP Gateway',
+        service: 'Peta Core',
         version: APP_INFO.version,
         status: 'running',
         endpoints: {
@@ -462,7 +462,7 @@ export async function startApplication() {
           // Create HTTPS server
           httpsServer = https.createServer(httpsOptions, app);
           httpsServer.listen(httpsPort, () => {
-            serverLogger.info({ port: httpsPort, protocol: 'https' }, 'Peta MCP Gateway HTTPS server listening');
+            serverLogger.info({ port: httpsPort, protocol: 'https' }, 'Peta Core HTTPS server listening');
           });
         }
       } catch (error) {
@@ -474,7 +474,7 @@ export async function startApplication() {
     if (!httpsServer) {
       httpServer = http.createServer(app);
       httpServer.listen(port, () => {
-        serverLogger.info({ port, protocol: 'http' }, 'Peta MCP Gateway HTTP server listening');
+        serverLogger.info({ port, protocol: 'http' }, 'Peta Core HTTP server listening');
       });
     }
 
@@ -712,7 +712,7 @@ export async function startApplication() {
   }
 }
 
-process.title = 'peta-mcp-gateway';
+process.title = 'peta-core';
 // If this file is run directly
 // Check if this module is the main entry point
 if (import.meta.url === `file://${process.argv[1]}`) {

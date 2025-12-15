@@ -254,7 +254,7 @@ export class AuthMiddleware {
 
     // Build WWW-Authenticate header
     // Format: Bearer error="...", error_description="...", resource_metadata="..."
-    return `Bearer realm="peta-mcp-gateway", error="${error}", error_description="${errorDescription}", resource_metadata="${metadataUrl}"`;
+    return `Bearer realm="peta-core", error="${error}", error_description="${errorDescription}", resource_metadata="${metadataUrl}"`;
   }
 
   /**

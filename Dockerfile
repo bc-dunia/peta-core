@@ -1,4 +1,4 @@
-# Peta MCP Gateway Docker Image
+# Peta Core Docker Image
 FROM node:20-alpine AS base
 
 # Set working directory

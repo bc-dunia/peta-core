@@ -1,6 +1,6 @@
 # Peta-Core Deployment Guide
 
-Welcome to Peta MCP Gateway! This guide will help you quickly deploy the Peta-Core service.
+Welcome to Peta Core! This guide will help you quickly deploy the Peta-Core service.
 
 ## 📋 Table of Contents
 
@@ -16,7 +16,7 @@ Welcome to Peta MCP Gateway! This guide will help you quickly deploy the Peta-Co
 
 ## 🎯 System Overview
 
-Peta MCP Gateway is an enterprise-grade **MCP (Model Context Protocol) proxy server** that provides a unified authentication, authorization, and session management layer for AI applications.
+Peta Core is an enterprise-grade **MCP (Model Context Protocol) proxy server** that provides a unified authentication, authorization, and session management layer for AI applications.
 
 ### Key Features
 
@@ -39,7 +39,7 @@ Use the automated deployment script to complete all configuration and startup wi
 
 ```bash
 # Download the deployment script
-curl -O https://raw.githubusercontent.com/dunialabs/peta-core/main/docs/docker-deploy.sh
+curl -O https://github.com/dunialabs/peta-core/blob/main/docs/docker-deploy.sh
 chmod +x docker-deploy.sh
 
 # Run the deployment script
@@ -85,7 +85,7 @@ Ensure the following ports are not in use:
 
 ```bash
 # 1. Download the deployment script
-curl -O https://raw.githubusercontent.com/dunialabs/peta-core/main/docs/docker-deploy.sh
+curl -O https://github.com/dunialabs/peta-core/blob/main/docs/docker-deploy.sh
 chmod +x docker-deploy.sh
 
 # 2. Run the deployment script
@@ -585,7 +585,7 @@ docker compose exec -T postgres psql -U peta peta_core_postgres < backup_2025010
 
 ## 📄 License
 
-Peta MCP Gateway is licensed under the Elastic License 2.0 (ELv2). See the LICENSE file for details.
+Peta Core is licensed under the Elastic License 2.0 (ELv2). See the LICENSE file for details.
 
 ---
 

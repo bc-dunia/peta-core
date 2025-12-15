@@ -1,6 +1,6 @@
 # Socket.IO Usage Documentation
 
-This document introduces the Socket.IO bidirectional communication functionality of Peta MCP Gateway.
+This document introduces the Socket.IO bidirectional communication functionality of Peta Core.
 
 ## Overview
 
@@ -19,7 +19,7 @@ Socket.IO server is attached to the existing Express HTTP/HTTPS server (port 300
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Peta MCP Gateway (3002)                  │
+│                    Peta Core (3002)                  │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  ┌─────────────┐         ┌──────────────────────────────┐   │

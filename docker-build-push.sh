@@ -2,7 +2,7 @@
 set -euo pipefail  # Exit on error, undefined vars, pipe failures
 
 # ============================================================================
-# Peta MCP Gateway - Docker Build & Push Script
+# Peta Core - Docker Build & Push Script
 # ============================================================================
 # Builds and pushes Docker images to Docker Hub with proper versioning
 # Usage: ./docker-build-push.sh [OPTIONS]
@@ -74,7 +74,7 @@ function log_verbose() {
 
 function show_help() {
   cat << EOF
-${BRIGHT}Docker Build & Push Script for Peta MCP Gateway${RESET}
+${BRIGHT}Docker Build & Push Script for Peta Core${RESET}
 
 ${BLUE}Usage:${RESET}
   ./docker-build-push.sh [OPTIONS]
@@ -625,7 +625,7 @@ function main() {
   echo -e "${BRIGHT}${BLUE}"
   cat << 'BANNER'
 ╔═══════════════════════════════════════════════════╗
-║   Peta MCP Gateway - Multi-Arch Docker Build      ║
+║   Peta Core - Multi-Arch Docker Build      ║
 ╚═══════════════════════════════════════════════════╝
 BANNER
   echo -e "${RESET}"

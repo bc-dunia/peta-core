@@ -55,7 +55,7 @@ SKIP_CLOUDFLARED=true npm run dev
 Peta Core ships with a shell script that prepares a Docker-based deployment:
 
 ```bash
-curl -O https://raw.githubusercontent.com/dunialabs/peta-core/main/docs/docker-deploy.sh
+curl -O https://github.com/dunialabs/peta-core/blob/main/docs/docker-deploy.sh
 chmod +x docker-deploy.sh
 ./docker-deploy.sh
 ```
@@ -178,14 +178,14 @@ The default Docker setup uses the following containers and settings.
 
 ### PostgreSQL
 
-- Container name: `peta-mcp-gateway-postgres`
+- Container name: `peta-core-postgres`
 - Port: `5432`
 - Database name: `peta_mcp_gateway`
 - User/password: `peta` / `peta123` (⚠️ change these in production)
 
 ### Cloudflared DDNS (optional)
 
-- Container name: `peta-mcp-gateway-cloudflared`
+- Container name: `peta-core-cloudflared`
 - Configuration directory: `./cloudflared`
 
 These values come from the default Docker compose files and can be adjusted to match your environment.

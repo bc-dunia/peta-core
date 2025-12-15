@@ -1,6 +1,6 @@
-# Peta MCP Gateway API Overview
+# Peta Core API Overview
 
-This document provides an overview and navigation for all APIs in Peta MCP Gateway.
+This document provides an overview and navigation for all APIs in Peta Core.
 
 ## Table of Contents
 
@@ -39,7 +39,7 @@ GET /mcp?token=<access_token>
 
 ### 1. MCP Protocol Interface
 
-Peta MCP Gateway fully implements the **Model Context Protocol (MCP)** standard protocol.
+Peta Core fully implements the **Model Context Protocol (MCP)** standard protocol.
 
 #### Core Endpoints
 

@@ -44,8 +44,8 @@ export class SocketService {
   private tokenValidator: TokenValidator;
   private connections: Map<string, UserConnection[]> = new Map();
   private sessionStore: any = null; // SessionStore instance (avoid circular dependency)
-  private serverName: string = "Peta MCP Gateway";
-  private serverId: string = "peta-mcp-gateway";
+  private serverName: string = "Peta Core";
+  private serverId: string = "peta-core";
   
   // Logger for SocketService
   private logger = createLogger('SocketService');

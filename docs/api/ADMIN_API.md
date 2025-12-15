@@ -1,8 +1,8 @@
-# Peta MCP Gateway Admin API Protocol Documentation
+# Peta Core Admin API Protocol Documentation
 
 ## Overview
 
-This document describes the complete protocol specification for Peta MCP Gateway Admin API. All admin operations are provided through a unified `/admin` endpoint using an action-based request routing mechanism.
+This document describes the complete protocol specification for Peta Core Admin API. All admin operations are provided through a unified `/admin` endpoint using an action-based request routing mechanism.
 
 ## Basic Information
 
@@ -1345,8 +1345,8 @@ null
 ```
 
 **Function Description**:
-- Stop Docker container (`docker stop peta-mcp-gateway-cloudflared`)
-- Delete Docker container (`docker rm peta-mcp-gateway-cloudflared`)
+- Stop Docker container (`docker stop peta-core-cloudflared`)
+- Delete Docker container (`docker rm peta-core-cloudflared`)
 - Delete local credential files:
   - `cloudflared/{tunnelId}.json`
   - `cloudflared/credentials.json`
@@ -1441,7 +1441,7 @@ null
 **Function Description**:
 1. Check container current running status
 2. If container is not running (`stopped` or `not_exist`), directly return success
-3. If container is running, execute `docker stop peta-mcp-gateway-cloudflared`
+3. If container is running, execute `docker stop peta-core-cloudflared`
 4. Verify container has stopped
 5. **Preserved**:
    - Docker container (stopped state)

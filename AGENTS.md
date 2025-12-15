@@ -4,7 +4,7 @@ This file provides Codex with project development guidelines and knowledge base 
 
 ## Project Overview
 
-Peta MCP Gateway is an MCP protocol proxy service that provides authentication, rate limiting, session management, event persistence, and OAuth 2.0 support.
+Peta Core is an MCP protocol proxy service that provides authentication, rate limiting, session management, event persistence, and OAuth 2.0 support.
 
 ### Tech Stack
 - TypeScript + ESM (imports use `.js` extension)

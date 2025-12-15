@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: peta-mcp-gateway-postgres
+    container_name: peta-core-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: peta
@@ -21,7 +21,7 @@ services:
 
   cloudflared:
     image: cloudflare/cloudflared:latest
-    container_name: peta-mcp-gateway-cloudflared
+    container_name: peta-core-cloudflared
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment:

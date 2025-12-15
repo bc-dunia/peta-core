@@ -24,7 +24,7 @@ export const CLOUDFLARED_CONFIG = {
    * Cloudflared container name
    * Can be overridden via CLOUDFLARED_CONTAINER_NAME environment variable
    */
-  CONTAINER_NAME: ENV.CLOUDFLARED_CONTAINER_NAME || 'peta-mcp-gateway-cloudflared',
+  CONTAINER_NAME: ENV.CLOUDFLARED_CONTAINER_NAME || 'peta-core-cloudflared',
 
   /**
    * Configuration directory path
