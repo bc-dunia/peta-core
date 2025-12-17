@@ -1179,16 +1179,16 @@ export class ServerManager {
   /**
    * Health check all servers
    */
-  async healthCheck(): Promise<{ [serverName: string]: ServerStatus }> {
-    const results: { [serverName: string]: ServerStatus } = {};
+  async healthCheck(): Promise<{ [serverID: string]: ServerStatus }> {
+    const results: { [serverID: string]: ServerStatus } = {};
     const servers = await this.getAllServers();
     for (const server of servers) {
       const context = this.serverContexts.get(server.serverId);
       if (context) {
-        results[server.serverName + ' (' + server.serverId + ')'] = context.status;
+        results[server.serverId] = context.status;
         continue;
       } else {
-        results[server.serverName + ' (' + server.serverId + ')'] = ServerStatus.Offline;
+        results[server.serverId] = ServerStatus.Offline;
       }
     }
     
