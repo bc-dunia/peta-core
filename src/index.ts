@@ -410,7 +410,7 @@ export async function startApplication() {
         const serverStatus = await authModule.serverManager.healthCheck();
         const sessionCount = authModule.sessionStore.getActiveSessionCount();
 
-        res.json({
+        res.status(200).json({
           status: 'healthy',
           timestamp: new Date().toISOString(),
           uptime: process.uptime(),
