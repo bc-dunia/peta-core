@@ -5,10 +5,12 @@ FROM node:20-alpine AS base
 WORKDIR /app
 
 # Install necessary system dependencies
-RUN apk add --no-cache \
+# Use --no-scripts to avoid post-install script issues in QEMU emulation
+RUN apk add --no-cache --no-scripts \
     postgresql-client \
     curl \
-    bash
+    bash && \
+    apk fix --no-cache
 
 # Build stage
 FROM base AS builder
@@ -32,12 +34,14 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 # Install runtime dependencies
-RUN apk add --no-cache \
+# Use --no-scripts to avoid post-install script issues in QEMU emulation
+RUN apk add --no-cache --no-scripts \
     postgresql-client \
     curl \
     bash \
     dumb-init \
-    docker-cli
+    docker-cli && \
+    apk fix --no-cache
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
