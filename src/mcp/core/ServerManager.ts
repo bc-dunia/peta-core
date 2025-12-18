@@ -669,7 +669,7 @@ export class ServerManager {
     // 4. Inject access token into environment variables (don't pass OAuth config)
     launchConfig.env = {
       ...launchConfig.env,
-      accessToken: initialToken,
+      notionToken: initialToken,
     };
 
     // 5. Remove oauth config (don't pass to downstream server)

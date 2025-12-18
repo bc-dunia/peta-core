@@ -242,9 +242,21 @@ export class ServerContext {
 
     // Calculate time until expiration (refresh 5 minutes early)
     const REFRESH_BUFFER = 5 * 60 * 1000; // 5 minutes
+    // Node.js setTimeout maximum delay (~24.8 days); anything larger overflows to immediate execution.
+    const MAX_TIMEOUT_MS = 2_147_000_000;
     const now = Date.now();
     const timeUntilExpiry = this.currentTokenInfo.expiresAt - now;
-    const refreshDelay = Math.max(timeUntilExpiry - REFRESH_BUFFER, 10000); // Wait at least 10 seconds
+    let refreshDelay = Math.max(timeUntilExpiry - REFRESH_BUFFER, 10000); // Wait at least 10 seconds
+
+    // Clamp to Node's maximum supported delay to avoid tight refresh loops when expiresAt is far in the future.
+    if (refreshDelay > MAX_TIMEOUT_MS) {
+      this.logger.debug({
+        serverName: this.serverEntity.serverName,
+        requestedDelaySeconds: Math.round(refreshDelay / 1000),
+        clampedDelaySeconds: Math.round(MAX_TIMEOUT_MS / 1000)
+      }, 'Refresh delay exceeds setTimeout limit, clamping to maximum supported delay');
+      refreshDelay = MAX_TIMEOUT_MS;
+    }
 
     this.logger.debug({
       serverName: this.serverEntity.serverName,
