@@ -26,7 +26,8 @@ export enum ServerCategory {
 export enum ServerAuthType {
   ApiKey = 1,      // API Key authentication
   GoogleAuth = 2,   // Google OAuth authentication
-  NotionAuth = 3   // Notion OAuth authentication
+  NotionAuth = 3,   // Notion OAuth authentication
+  FigmaAuth = 4,   // Figma OAuth authentication
 }
 
 export enum MCPEventLogType {

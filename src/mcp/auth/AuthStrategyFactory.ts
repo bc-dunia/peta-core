@@ -2,6 +2,7 @@ import { ServerAuthType } from '../../types/enums.js';
 import { IAuthStrategy } from './IAuthStrategy.js';
 import { GoogleAuthStrategy } from './GoogleAuthStrategy.js';
 import { NotionAuthStrategy } from './NotionAuthStrategy.js';
+import { FigmaAuthStrategy } from './FigmaAuthStrategy.js';
 import { createLogger } from '../../logger/index.js';
 
 // Logger for AuthStrategyFactory
@@ -31,6 +32,15 @@ export class AuthStrategyFactory {
 
       case ServerAuthType.NotionAuth:
         return new NotionAuthStrategy({
+          clientId: config.clientId,
+          clientSecret: config.clientSecret,
+          refreshToken: config.refreshToken,
+          accessToken: config.accessToken,
+          expiresAt: config.expiresAt,
+        });
+
+      case ServerAuthType.FigmaAuth:
+        return new FigmaAuthStrategy({
           clientId: config.clientId,
           clientSecret: config.clientSecret,
           refreshToken: config.refreshToken,

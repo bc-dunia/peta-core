@@ -567,6 +567,11 @@ export class ServerManager {
         await this.initializeNotionAuth(serverContext, launchConfig);
         break;
 
+      case ServerAuthType.FigmaAuth:
+        serverContext.userToken = token;
+        await this.initializeFigmaAuth(serverContext, launchConfig);
+        break;
+
       case ServerAuthType.ApiKey:
         // API Key doesn't need special handling, just pass through
         break;
@@ -676,6 +681,51 @@ export class ServerManager {
     delete launchConfig.oauth;
 
     this.logger.info({ serverName: serverContext.serverEntity.serverName }, 'Notion OAuth initialized');
+  }
+
+  /**
+   * Initialize Figma OAuth authentication
+   */
+  private async initializeFigmaAuth(
+    serverContext: ServerContext,
+    launchConfig: any
+  ): Promise<void> {
+    // 1. Verify OAuth configuration exists
+    if (
+      !launchConfig.oauth?.clientId ||
+      !launchConfig.oauth?.clientSecret ||
+      !launchConfig.oauth?.refreshToken
+    ) {
+      throw new Error(
+        `[ServerManager] Missing OAuth configuration for server ${serverContext.serverID}. Required: clientId, clientSecret, refreshToken`
+      );
+    }
+
+    // 2. Create authentication strategy
+    const authStrategy = AuthStrategyFactory.create(
+      ServerAuthType.FigmaAuth,
+      launchConfig.oauth
+    );
+
+    if (!authStrategy) {
+      throw new Error(
+        `[ServerManager] Failed to create auth strategy for server ${serverContext.serverID}`
+      );
+    }
+
+    // 3. Start token refresh and get initial token
+    const initialToken = await serverContext.startTokenRefresh(authStrategy);
+
+    // 4. Inject access token into environment variables (don't pass OAuth config)
+    launchConfig.env = {
+      ...launchConfig.env,
+      accessToken: initialToken,
+    };
+
+    // 5. Remove oauth config (don't pass to downstream server)
+    delete launchConfig.oauth;
+
+    this.logger.info({ serverName: serverContext.serverEntity.serverName }, 'Figma OAuth initialized');
   }
 
   /**
