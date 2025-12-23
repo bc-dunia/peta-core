@@ -207,6 +207,8 @@ export class ConfigureServerHandler {
 
     if (template.authType === ServerAuthType.NotionAuth && !processedConfig.oauth.expiresAt) {
       processedConfig.oauth.expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+    } else if (template.authType === ServerAuthType.FigmaAuth && !processedConfig.oauth.expiresAt) {
+      processedConfig.oauth.expiresAt = Date.now() + 90 * 24 * 60 * 60 * 1000;
     }
     return processedConfig;
   }
