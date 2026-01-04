@@ -264,5 +264,5 @@ Subject to the terms of the Elastic License 2.0, you are encouraged to:
 
 For detailed terms, see the [LICENSE](../LICENSE) file.
 
-Copyright © 2025 [Dunia Labs, Inc.](https://dunialabs.io)
+Copyright © 2026 [Dunia Labs, Inc.](https://dunialabs.io)
 
