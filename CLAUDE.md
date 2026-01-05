@@ -572,7 +572,6 @@ Configuration is distributed across multiple files:
 
 - **`src/config/config.ts`** - App metadata from package.json (APP_INFO)
 - **`src/config/auth.config.ts`** - Token expiration, cookie settings
-- **`src/config/mcpSessionConfig.ts`** - MCP protocol version, timeouts
 - **`src/config/reverseRequestConfig.ts`** - Reverse request timeouts (30s)
 - **`.env`** - Runtime environment variables (DATABASE_URL, ports, SSL)
 
