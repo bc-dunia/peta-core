@@ -1,22 +1,26 @@
-# Peta Core – MCP Vault & Gateway for AI Agents
+# Peta Core – The Control Plane Runtime for MCP
+Secure vault • Managed MCP runtime • Tool-call audit trail • Policy-based approvals  
+One layer between your AI agents and your tools & APIs — policies enforced, credentials injected server-side, every call logged.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+
 ![Node](https://img.shields.io/badge/node-%3E%3D18-green.svg)
 ![License](https://img.shields.io/badge/license-ELv2-blue.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)
 
-Peta Core is a **zero-trust MCP gateway and vault** for AI agents. 
+Peta Core is the **control-plane runtime** for MCP: a zero-trust gateway + vault-backed credential injection layer that also manages downstream MCP server lifecycle (warm pools, health checks, autoscaling).
 
-Think of it as **1Password for AI agents**: an MCP vault and gateway that keeps credentials server-side, issues short-lived agent tokens, enforces access policies and human approvals, and records an audit trail for every tool call.
+Often described as “1Password for AI agents” because secrets never reach clients — but the bigger value is centralized policy, approvals, and audit across every tool call.
 
 Use Peta Core to connect ChatGPT, Claude, Cursor, n8n, or any MCP-compatible client to your internal tools, APIs, and data sources—without embedding raw secrets into prompts or client configs.
 
-**Key guarantees**
+**Key guarantees** 
 
-- Secrets stay in a server-side vault (encrypted at rest) and are injected only at execution time.
-- Every request is authenticated, policy-checked (optionally human-approved), and logged.
-- One control plane for auth, authorization, rate limiting, and observability across MCP servers.
+- **Managed MCP runtime:** orchestrate downstream MCP servers with lifecycle management (warm pools, scaling, health checks).
+- **Secure vault:** secrets stay encrypted server-side and are injected only at execution time (never in prompts or client configs).
+- **Policy-based approvals:** enforce RBAC/ABAC and optional human approval for high-risk tools.
+- **Tool-call audit trail:** every tool call is logged with identity, policy decision, and outcome (without leaking raw secrets).
+
 
 
 ⚡ **Quick Start (no-code / easiest install)** → [https://peta.io/quick-start](https://peta.io/quick-start) 
@@ -46,9 +50,11 @@ Peta Core uses the same MCP protocol in both directions, so you can plug it into
 
 ### Why Peta Core?
 
+Without a control plane, MCP turns into an ops + governance problem: server sprawl, secret exposure, missing approvals, and no audit trail.
+
 Running agents directly against individual MCP servers causes a few problems:
 
-- Each server must implement its own authentication, rate limiting, logging, and monitoring.
+- MCP Servers Are a Full-Time Job. Each server must implement its own authentication, rate limiting, logging, and monitoring.
 - Tool and resource permissions are often coarse (server-wide) instead of per user or per client.
 - Secrets such as API keys tend to be shared across environments and copied into client configuration.
 - There is no consistent way to introduce human approval for sensitive operations.
@@ -95,43 +101,31 @@ At a high level, Peta Core is responsible for:
 
 ## Core Features
 
-Peta Core sits between MCP clients and downstream MCP servers and provides:
+Peta Core provides the runtime layer of the MCP Control Plane: secure credential handling, policy enforcement, approvals, and audit — for every tool call.
 
-- **Three-layer permission model**  
-  Server-level, admin-level, and per-user/per-client filters that control what each agent can see and call.
+### 1) Managed MCP Gateway & Runtime
+- **Transparent MCP proxying.** Acts as an MCP server upstream and an MCP client downstream — no custom extensions required.
+- **Multi-server routing.** Mount multiple downstream MCP servers behind one stable endpoint (e.g. `serverId::toolName`).
+- **Downstream lifecycle (optional).** Run/monitor downstream servers with health checks and lifecycle hooks when needed.
 
-- **Human-in-the-loop approvals**  
-  Policy rules can mark specific tools as approval-required. When an agent calls such a tool, execution is paused and an approval request is sent to Peta Desk (or another UI) so a human can approve or reject the call.
+### 2) Secure Vault & Server-side Credential Injection
+- **Secrets never reach MCP clients.** Credentials stay encrypted server-side and are injected just-in-time at execution.
+- **Vault-backed connectors.** Downstream MCP servers receive the credentials they need only for the duration of a call.
+- **Encrypted config storage.** Server configs and per-user configuration blobs can be stored encrypted at rest.
+- See: [Security & Permissions](./docs/security.md) for encryption and key management details.
 
-- **Zero-trust credential handling**  
-  Agents receive only short-lived Peta agent tokens; real API keys and other secrets stay in the server-side MCP vault and are injected into downstream MCP servers only at runtime. Secret values are encrypted at rest using AES-GCM, with the encryption key derived via PBKDF2 from an operator-managed secret plus a per-record random salt, so compromising the database alone is not enough to recover credentials.
+### 3) Policy Enforcement & Approvals
+- **Fine-grained policy checks.** Enforce RBAC/ABAC + capability filtering per user/agent/client/tool.
+- **Human-in-the-loop approvals.** Pause execution for sensitive tools and resume only after an approval decision (Desk or external UI).
+- **Quota & network controls.** Rate limiting and optional IP allow-lists can be applied per workspace/user.
 
-- **Local credential vault with a master key**  
-  Access tokens and per-user credentials are encrypted with a key derived from a user-chosen master password (PBKDF2 + AES-GCM); plaintext secrets never hit disk and never leave the device.
+### 4) Tool-call Audit Trail & Observability
+- **Audit trail by default.** Record who called what, the policy decision, and the outcome (without logging raw secrets).
+- **Structured logs & metrics hooks.** Designed to integrate with your logging/monitoring stack.
 
-- **Authentication & identity**  
-  JWT-based identity for humans and agents, plus OAuth 2.0 flows for obtaining access tokens. Supports multi-tenant deployments where multiple workspaces share a single gateway.
-
-- **Transparent MCP proxying**  
-  Acts as an MCP server to clients and an MCP client to downstream servers. Multiple servers can be mounted behind a single endpoint with namespacing such as `serverId::resourceName`.
-
-- **Rate limiting and IP controls**  
-  Per-user and per-workspace quotas can be enforced, with optional IP allow-lists to restrict where the gateway can be called from.
-
-- **Event persistence and reconnection**  
-  Events are persisted so clients can resume streams using `Last-Event-ID` after network interruptions. A two-layer cache (in-memory + PostgreSQL) is used to balance performance and durability.
-
-- **Socket.IO real-time channel**  
-  A Socket.IO channel exposes notifications, presence signals, and a request/response pattern used by Peta Desk for capability configuration and approval flows.
-
-- **Encrypted configuration storage**  
-  Downstream server launch configurations and user-supplied credentials are encrypted before being stored.
-
-- **User-configurable servers**  
-  Users can configure certain MCP servers that require per-user input (for example, API keys) via Peta Desk without touching the gateway’s global configuration.
-
-- **Observability and audit**  
-  Structured logs (for example using Pino) and database-backed audit records capture who called which tool, with which parameters, and when, without logging raw secrets or vault key material.
+### Reliability
+- **Stream resumption.** Persist events so clients can resume streams via `Last-Event-ID` after interruptions.
+- **Real-time notifications channel.** Supports approval/notification workflows (e.g. Desk integrations).
 
 ---
 
@@ -270,5 +264,5 @@ Subject to the terms of the Elastic License 2.0, you are encouraged to:
 
 For detailed terms, see the [LICENSE](../LICENSE) file.
 
-Copyright © 2025 [Dunia Labs, Inc.](https://dunialabs.io)
+Copyright © 2026 [Dunia Labs, Inc.](https://dunialabs.io)
 

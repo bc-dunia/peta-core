@@ -25,7 +25,7 @@ import { SocketService } from './socket/SocketService.js';
 import { socketNotifier } from './socket/SocketNotifier.js';
 
 import cors from 'cors';
-import { DEFAULT_PROTOCOL_VERSION } from './config/mcpSessionConfig.js';
+import { LATEST_PROTOCOL_VERSION }  from "@modelcontextprotocol/sdk/types.js";
 import { CapabilitiesService } from './mcp/services/CapabilitiesService.js';
 import { APP_INFO } from './config/config.js';
 import { createLogger } from './logger/index.js';
@@ -267,7 +267,7 @@ export async function startApplication() {
           'WWW-Authenticate': `Bearer error="invalid_token", error_description="Missing Authorization header", resource_metadata="${metadataUrl}"`,
           'Allow': CORS_CONFIG.ALLOW_METHODS,
           'Content-Type': 'application/json',
-          'mcp-protocol-version': DEFAULT_PROTOCOL_VERSION,
+          'mcp-protocol-version': LATEST_PROTOCOL_VERSION,
           connection: 'keep-alive',
         }).end(
           JSON.stringify({
@@ -286,7 +286,7 @@ export async function startApplication() {
           'Access-Control-Expose-Headers': CORS_CONFIG.EXPOSE_HEADERS_BASIC,
           'Allow': CORS_CONFIG.ALLOW_METHODS,
           'Content-Type': 'application/json',
-          'mcp-protocol-version': DEFAULT_PROTOCOL_VERSION,
+          'mcp-protocol-version': LATEST_PROTOCOL_VERSION,
           connection: 'keep-alive',
         }).end(
           JSON.stringify({

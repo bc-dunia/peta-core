@@ -80,7 +80,6 @@ import { Request, Response } from 'express';
 import { PersistentEventStore } from './PersistentEventStore.js';
 import { RequestIdMapper } from './RequestIdMapper.js';
 import { APP_INFO } from '../../config/config.js';
-import { DEFAULT_PROTOCOL_VERSION } from "../../config/mcpSessionConfig.js";
 import { DangerLevel, MCPEventLogType } from "../../types/enums.js";
 import { socketNotifier } from '../../socket/SocketNotifier.js';
 import { ProxyContext } from '../../types/mcp.types.js';
@@ -158,12 +157,6 @@ export class ProxySession {
       this.isInitialized = true;
       this.clientSession.connectionInitialized(this.upstreamServer);
     };
-    
-    // Enable initialization handler
-    this.upstreamServer.setRequestHandler(
-      InitializeRequestSchema,
-      async (request: InitializeRequest, extra: RequestHandlerExtra<any, any>) => this.handleInitialize(request, extra)
-    );
 
     // Tools
     this.upstreamServer.setRequestHandler(
@@ -265,7 +258,10 @@ export class ProxySession {
         transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => this.sessionId,
           onsessioninitialized: async (sessionId) => {
-            this.logger.info({ sessionId }, 'Session initialized');
+            this.clientSession.capabilities = this.upstreamServer.getClientCapabilities();
+            this.clientSession.clientInfo = this.upstreamServer.getClientVersion();
+
+            this.logger.info({ sessionId:sessionId, clientInfo: this.clientSession.clientInfo, capabilities: this.clientSession.capabilities }, 'Session initialized');
             this.isInitialized = true;
           },
           onsessionclosed: async (sessionId: string) => {
@@ -320,35 +316,6 @@ export class ProxySession {
         throw error;
       }
     }
-  }
-
-  /**
-   * Handle initialization request - not forwarded to downstream
-   */
-  private async handleInitialize(
-    request: InitializeRequest,
-    extra: RequestHandlerExtra<any, any>
-  ): Promise<InitializeResult> {
-    this.logger.info('Initializing proxy session');
-
-    this.clientSession.capabilities = request.params.capabilities;
-    // Save clientInfo to ClientSession
-    this.clientSession.clientInfo = request.params.clientInfo;
-
-    this.logger.debug({ capabilities: request.params.capabilities, clientInfo: request.params.clientInfo }, 'Client capabilities and info set');
-    
-    // Aggregate capabilities from all servers
-    const aggregatedCapabilities = this.clientSession.getServerCapabilities();
-    this.logger.debug({ aggregatedCapabilities }, 'Aggregated server capabilities');
-
-    return {
-      protocolVersion: DEFAULT_PROTOCOL_VERSION,
-      capabilities: aggregatedCapabilities,
-      serverInfo: {
-        name: APP_INFO.name,
-        version: APP_INFO.version,
-      }
-    };
   }
 
   /**
