@@ -432,6 +432,9 @@ export class ProxySession {
       throw new McpError(ErrorCode.InvalidParams, errorMsg);
     }
 
+    // Ensure server is available (lazy start)
+    await this.serverManager.ensureServerAvailable(result.serverID, this.clientSession.userId);
+
     const targetServerContext = this.serverManager.getServerContext(result.serverID, this.clientSession.userId);
 
     // Get downstream connection
@@ -683,6 +686,9 @@ export class ProxySession {
 
       throw new McpError(ErrorCode.InvalidParams, errorMsg);
     }
+
+    // Ensure server is available (lazy start)
+    await this.serverManager.ensureServerAvailable(result.serverID, this.clientSession.userId);
 
     // Routing decision
     const targetServer = this.serverManager.getServerContext(result.serverID, this.clientSession.userId);
@@ -1033,6 +1039,9 @@ export class ProxySession {
       );
     }
 
+    // Ensure server is available (lazy start)
+    await this.serverManager.ensureServerAvailable(parseResult.serverID, this.clientSession.userId);
+
     // Routing decision
     const targetServerContext = this.serverManager.getServerContext(parseResult.serverID, this.clientSession.userId);
 
@@ -1184,6 +1193,9 @@ export class ProxySession {
         `Invalid completion reference: ${request.params.ref}`,
       );
     }
+
+    // Ensure server is available (lazy start)
+    await this.serverManager.ensureServerAvailable(result.serverID, this.clientSession.userId);
 
     // Routing decision
     const targetServerContext = this.serverManager.getServerContext(result.serverID, this.clientSession.userId);

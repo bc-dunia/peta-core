@@ -407,7 +407,7 @@ export async function startApplication() {
     // Health check endpoint
     app.get('/health', async (req, res) => {
       try {
-        const serverStatus = await authModule.serverManager.healthCheck();
+        const serverStatus = await authModule.serverManager.getAllServersStatus();
         const sessionCount = authModule.sessionStore.getActiveSessionCount();
 
         res.status(200).json({

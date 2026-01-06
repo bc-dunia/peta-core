@@ -7,7 +7,7 @@ import { ServerConfigCapabilities, ToolCapabilityConfig, ResourceCapabilityConfi
 import { CapabilitiesService } from "../services/CapabilitiesService.js";
 import { IAuthStrategy, TokenInfo } from '../auth/IAuthStrategy.js';
 import { createLogger } from '../../logger/index.js';
-import type { ServerManager } from './ServerManager.js';
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 /**
  * Downstream Server context object
@@ -41,6 +41,15 @@ export class ServerContext {
   // Only used in scenarios requiring refresh token persistence (e.g., Notion OAuth)
   userToken?: string;
 
+  // Last activity time (for idle detection in lazy start)
+  lastActive: number;
+
+  // Cached capabilities (preloaded from database)
+  cachedTools?: ListToolsResult;
+  cachedResources?: ListResourcesResult;
+  cachedResourceTemplates?: ListResourceTemplatesResult;
+  cachedPrompts?: ListPromptsResult;
+
   // Authentication related fields
   private authStrategy?: IAuthStrategy;
   private tokenRefreshTimer?: NodeJS.Timeout;
@@ -52,11 +61,12 @@ export class ServerContext {
   constructor(serverEntity: Server) {
     // Assign ID and increment counter
     this.id = String(ServerContext.nextId++);
-    
+
     this.serverID = serverEntity.serverId;
     this.serverEntity = serverEntity;
     this.status = ServerStatus.Offline;
     this.lastSync = new Date();
+    this.lastActive = Date.now();
     this.errorCount = 0;
 
     this.capabilitiesConfig = { tools: {}, resources: {}, prompts: {} };
@@ -69,6 +79,33 @@ export class ServerContext {
       } catch (error) {
         this.logger.error({ error, serverId: this.serverID }, 'Error parsing server capabilities');
       }
+    }
+
+    // Preload cached capabilities from database
+    this.loadCachedCapabilities(serverEntity);
+  }
+
+  /**
+   * Load cached capabilities from serverEntity
+   */
+  private loadCachedCapabilities(serverEntity: Server): void {
+    try {
+      if (serverEntity.cachedTools) {
+        this.cachedTools = JSON.parse(serverEntity.cachedTools);
+      }
+      if (serverEntity.cachedResources) {
+        this.cachedResources = JSON.parse(serverEntity.cachedResources);
+      }
+      if (serverEntity.cachedResourceTemplates) {
+        this.cachedResourceTemplates = JSON.parse(serverEntity.cachedResourceTemplates);
+      }
+      if (serverEntity.cachedPrompts) {
+        this.cachedPrompts = JSON.parse(serverEntity.cachedPrompts);
+      }
+
+      this.logger.debug({ serverId: this.serverID }, 'Cached capabilities loaded');
+    } catch (error) {
+      this.logger.error({ error, serverId: this.serverID }, 'Failed to load cached capabilities');
     }
   }
 
@@ -87,24 +124,40 @@ export class ServerContext {
     this.lastSync = new Date();
   }
 
-  updateTools(newTools: ListToolsResult) {
+  async updateTools(newTools: ListToolsResult) {
     this.tools = newTools;
     this.lastSync = new Date();
-  }
-  
-  updateResources(newResources?: ListResourcesResult) {
-    this.resources = newResources;
-    this.lastSync = new Date();
+
+    // Persist to database
+    await this.persistCapabilitiesCache({ tools: newTools });
   }
 
-  updateResourceTemplates(newResourceTemplates?: ListResourceTemplatesResult) {
+  async updateResources(newResources?: ListResourcesResult) {
+    this.resources = newResources;
+    this.lastSync = new Date();
+
+    // Persist to database
+    if (newResources) {
+      await this.persistCapabilitiesCache({ resources: newResources });
+    }
+  }
+
+  async updateResourceTemplates(newResourceTemplates?: ListResourceTemplatesResult) {
     this.resourceTemplates = newResourceTemplates;
     this.lastSync = new Date();
+
+    // Persist to database
+    if (newResourceTemplates) {
+      await this.persistCapabilitiesCache({ resourceTemplates: newResourceTemplates });
+    }
   }
-  
-  updatePrompts(newPrompts: ListPromptsResult) {
+
+  async updatePrompts(newPrompts: ListPromptsResult) {
     this.prompts = newPrompts;
     this.lastSync = new Date();
+
+    // Persist to database
+    await this.persistCapabilitiesCache({ prompts: newPrompts });
   }
 // Get server's own permission configuration
   getMcpCapabilities(): ServerConfigWithEnabled {
@@ -370,6 +423,22 @@ export class ServerContext {
     }
   }
 
+  async closeConnection(status: ServerStatus): Promise<void> {
+    if (!this.connection) {
+      return;
+    }
+
+    this.status = status;
+    
+    if (this.transport instanceof StreamableHTTPClientTransport) {
+      await this.transport?.terminateSession();
+    }
+
+    await this.connection.close();
+    this.connection = undefined;
+  }
+
+
   /**
    * Stop automatic token refresh
    */
@@ -472,5 +541,25 @@ export class ServerContext {
    */
   getTokenExpiresAt(): number | undefined {
     return this.currentTokenInfo?.expiresAt;
+  }
+
+  /**
+   * Persist capabilities cache to database
+   */
+  private async persistCapabilitiesCache(data: {
+    tools?: any;
+    resources?: any;
+    resourceTemplates?: any;
+    prompts?: any;
+  }): Promise<void> {
+    try {
+      const { ServerRepository } = await import('../../repositories/ServerRepository.js');
+      await ServerRepository.updateCapabilitiesCache(this.serverID, data);
+
+      this.logger.debug({ serverId: this.serverID, updatedFields: Object.keys(data) }, 'Capabilities cache updated');
+    } catch (error) {
+      this.logger.error({ error, serverId: this.serverID }, 'Failed to persist capabilities cache');
+      // Don't throw error to avoid affecting main flow
+    }
   }
 }

@@ -106,6 +106,11 @@ export class ConfigController {
         if (req.authContext?.role !== UserRole.Owner && req.authContext?.role !== UserRole.Admin) {
           throw new AdminError('Only Owner and Admin role can perform admin operations.', AdminErrorCode.FORBIDDEN);
         }
+
+        // Cache Owner token for lazy start
+        if (req.authContext?.role === UserRole.Owner && token) {
+          this.serverManager.setOwnerToken(token);
+        }
       }
 
       // Route to corresponding handler method based on operation type

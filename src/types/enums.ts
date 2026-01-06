@@ -102,6 +102,7 @@ export enum ServerStatus {
   Offline = 1,  // Offline
   Connecting = 2, // Connecting
   Error = 3,    // Error
+  Sleeping = 4  // Sleeping (lazy start)
 }
 
 export enum DangerLevel {

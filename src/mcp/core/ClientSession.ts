@@ -191,7 +191,8 @@ export class ClientSession {
             serverId,
             this.userId,
             tempServerEntity,
-            this.token
+            this.token,
+            // true
           );
 
           if (serverContext.tools?.tools?.length ?? 0 > 0) {
@@ -234,15 +235,14 @@ export class ClientSession {
   canAccessServer(serverID: string): boolean {
     const serverContext = ServerManager.instance.getServerContext(serverID, this.userId);
     if (!serverContext) return false;
-    if (serverContext.status !== ServerStatus.Online) return false;
     if (!serverContext.serverEntity.enabled) return false;
+    if (serverContext.status !== ServerStatus.Online && serverContext.status !== ServerStatus.Sleeping) return false;
+    const userPreferencesEnabled = this.userPreferences[serverID]?.enabled ?? true;
     if (serverContext.serverEntity.allowUserInput) {
       if (serverContext.userId !== this.userId) return false;
-      const userPreferencesEnabled = this.userPreferences[serverID]?.enabled ?? true;
       return userPreferencesEnabled;
     } else {
       const serverPermsEnabled = this.permissions[serverID]?.enabled ?? true;
-      const userPreferencesEnabled = this.userPreferences[serverID]?.enabled ?? true;
       return serverPermsEnabled && userPreferencesEnabled;
     }
   }
@@ -440,15 +440,26 @@ export class ClientSession {
   // Get all server tools within permission scope
   listTools(): ListToolsResult {
     const allTools: Tool[] = [];
-    
+
     const availableServers = this.getAvailableServers();
     for (const serverContext of availableServers) {
+      let toolsData: Tool[] | undefined;
+
+      // Prefer real-time data
       if (serverContext.tools?.tools) {
+        toolsData = serverContext.tools.tools;
+      }
+      // Use cached data if real-time data not available
+      else if (serverContext.cachedTools?.tools) {
+        toolsData = serverContext.cachedTools.tools;
+      }
+
+      if (toolsData) {
         // Filter tools within permission scope
-        const filteredTools = serverContext.tools.tools.filter((tool: Tool) => {
+        const filteredTools = toolsData.filter((tool: Tool) => {
           return this.canUseToolByServerContext(serverContext, tool.name);
         });
-        
+
         // Add server ID prefix to each tool
         const prefixedTools = filteredTools.map((tool: Tool) => {
           const userDangerLevel = this.getDangerLevel(serverContext.serverID, tool.name);
@@ -487,15 +498,26 @@ export class ClientSession {
    */
   listResources(): ListResourcesResult {
     const allResources: Resource[] = [];
-    
+
     for (const serverContext of this.getAvailableServers()) {
+      let resourcesData: Resource[] | undefined;
+
+      // Prefer real-time data
       if (serverContext.resources?.resources) {
+        resourcesData = serverContext.resources.resources;
+      }
+      // Use cached data if real-time data not available
+      else if (serverContext.cachedResources?.resources) {
+        resourcesData = serverContext.cachedResources.resources;
+      }
+
+      if (resourcesData) {
         // Filter resources within permission scope
-        const filteredResources = serverContext.resources.resources.filter((resource: Resource) => {
+        const filteredResources = resourcesData.filter((resource: Resource) => {
           // If no specific resource permissions configured, default to allow all
           return this.canAccessResourceByServerContext(serverContext, resource.name);
         });
-        
+
         // Add server ID prefix and proxy URI to each resource
         const prefixedResources = filteredResources.map((resource: Resource) => ({
           ...resource,
@@ -516,8 +538,19 @@ export class ClientSession {
   listResourceTemplates(): ListResourceTemplatesResult {
     const allResourceTemplates: ResourceTemplate[] = [];
     for (const serverContext of this.getAvailableServers()) {
+      let resourceTemplatesData: ResourceTemplate[] | undefined;
+
+      // Prefer real-time data
       if (serverContext.resourceTemplates?.resourceTemplates) {
-        const filteredResourceTemplates = serverContext.resourceTemplates.resourceTemplates.filter((resourceTemplate: ResourceTemplate) => {
+        resourceTemplatesData = serverContext.resourceTemplates.resourceTemplates;
+      }
+      // Use cached data if real-time data not available
+      else if (serverContext.cachedResourceTemplates?.resourceTemplates) {
+        resourceTemplatesData = serverContext.cachedResourceTemplates.resourceTemplates;
+      }
+
+      if (resourceTemplatesData) {
+        const filteredResourceTemplates = resourceTemplatesData.filter((resourceTemplate: ResourceTemplate) => {
           return this.canAccessResourceByServerContext(serverContext, resourceTemplate.name);
         });
         const prefixedResourceTemplates = filteredResourceTemplates.map((resourceTemplate: ResourceTemplate) => ({
@@ -540,24 +573,32 @@ export class ClientSession {
    */
   listPrompts(): ListPromptsResult {
     const allPrompts: Prompt[] = [];
-    
+
     for (const serverContext of this.getAvailableServers()) {
+      // Prefer real-time data, fall back to cached data
+      let promptsData: Prompt[] | undefined;
       if (serverContext.prompts?.prompts) {
+        promptsData = serverContext.prompts.prompts;
+      } else if (serverContext.cachedPrompts?.prompts) {
+        promptsData = serverContext.cachedPrompts.prompts;
+      }
+
+      if (promptsData) {
         // Filter prompts within permission scope
-        const filteredPrompts = serverContext.prompts.prompts.filter((prompt: Prompt) => {
+        const filteredPrompts = promptsData.filter((prompt: Prompt) => {
           return this.canUsePromptByServerContext(serverContext, prompt.name);
         });
-        
+
         // Add server ID prefix to each prompt
         const prefixedPrompts = filteredPrompts.map((prompt: Prompt) => ({
           ...prompt,
           name: this.generateNewName(serverContext.id, prompt.name)
         }));
-        
+
         allPrompts.push(...prefixedPrompts);
       }
     }
-    
+
     return {
       prompts: allPrompts,
       _meta: {
