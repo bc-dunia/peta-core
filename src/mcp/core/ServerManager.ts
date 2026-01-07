@@ -718,6 +718,15 @@ export class ServerManager {
       // 6. Establish connection
       await client.connect(transport);
       this.logger.info({ serverName: serverEntity.serverName }, 'Connection established');
+      if (serverEntity.category === ServerCategory.CustomRemote) {
+        const serverInfo = client.getServerVersion();
+        if (serverInfo?.name != serverEntity.serverName && serverInfo?.name ) {
+          await ServerRepository.update(serverEntity.serverId, {
+            serverName: serverInfo.name
+          });
+        }
+        serverEntity.serverName = serverInfo?.name ?? serverEntity.serverName;
+      }
 
       // 7. Register global reverse request handlers
       this.registerReverseRequestHandlers(client, serverEntity.serverId);
