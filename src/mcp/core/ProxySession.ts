@@ -348,7 +348,8 @@ export class ProxySession {
    */
   private async handleToolCall(
     request: CallToolRequest,
-    extra: RequestHandlerExtra<any, any>
+    extra: RequestHandlerExtra<any, any>,
+    retryCount: number = 0
   ): Promise<CallToolResult> {
     const startTime = Date.now();
     const toolName = request.params.name;
@@ -496,6 +497,8 @@ export class ProxySession {
       method: request.method
     }, 'Registering tool call request');
 
+    let isReconnected: boolean | undefined;
+
     try {
 
       // Forward request to downstream server, passing signal and proxyRequestId
@@ -507,6 +510,8 @@ export class ProxySession {
           relatedRequestId: proxyRequestId  // Use proxyRequestId as related ID
         }
       )) as CallToolResult;
+
+      targetServerContext.clearTimeout();
 
       // Log response to client
       await this.sessionLogger.logClientRequest({
@@ -524,19 +529,9 @@ export class ProxySession {
     } catch (error) {
       this.logger.error({ error }, 'Error handling tool call');
 
-      targetServerContext?.recordTimeout(error);
-      const errorMsg = String(error);
+      isReconnected = await targetServerContext?.recordTimeout(error);
 
-      // Create error result
-      const errorResult: CallToolResult = {
-        content: [
-          {
-            type: "text",
-            text: errorMsg,
-          },
-        ],
-        isError: true,
-      };
+      const errorMsg = String(error);
 
       await this.sessionLogger.logClientRequest({
         action: MCPEventLogType.ResponseTool,
@@ -549,6 +544,20 @@ export class ProxySession {
         statusCode: 500,
       });
 
+      if (isReconnected == false && retryCount < 2) {
+        return await this.handleToolCall(request, extra, retryCount + 1);
+      }
+
+      // Create error result
+      const errorResult: CallToolResult = {
+        content: [
+          {
+            type: "text",
+            text: errorMsg,
+          },
+        ],
+        isError: true,
+      };
       return errorResult;
     } finally {
       // Clean up request mapping
@@ -608,7 +617,8 @@ export class ProxySession {
    */
   private async handleResourceRead(
     request: ReadResourceRequest,
-    extra: RequestHandlerExtra<any, any>
+    extra: RequestHandlerExtra<any, any>,
+    retryCount: number = 0
   ): Promise<ReadResourceResult> {
     const startTime = Date.now();
     const resourceUri = request.params.uri;
@@ -722,6 +732,8 @@ export class ProxySession {
       proxyContext: proxyContext
     };
 
+    let isReconnected: boolean | undefined;
+
     try {
 
       // Forward request, passing signal and proxyRequestId
@@ -730,22 +742,28 @@ export class ProxySession {
         relatedRequestId: proxyRequestId  // Use proxyRequestId as related ID
       });
 
-      // Log response to client
-      await this.sessionLogger.logClientRequest({
-        action: MCPEventLogType.ResponseResource,        
-        serverId: targetServer.serverEntity.serverId,        
-        upstreamRequestId: String(originalRequestId),
-        uniformRequestId: uniformRequestId,
-        requestParams: request.params,
-        responseResult: serverResult,
-        duration: Date.now() - startTime,
-        statusCode: 200,
-      });
+      targetServer.clearTimeout();
+
+      try {
+        // Log response to client
+        await this.sessionLogger.logClientRequest({
+          action: MCPEventLogType.ResponseResource,
+          serverId: targetServer.serverEntity.serverId,
+          upstreamRequestId: String(originalRequestId),
+          uniformRequestId: uniformRequestId,
+          requestParams: request.params,
+          responseResult: serverResult,
+          duration: Date.now() - startTime,
+          statusCode: 200,
+        });
+      } catch (error) {
+        this.logger.error({ error }, 'Error logging resource read response');
+      }
 
       return serverResult;
     } catch (error) {
       this.logger.error({ error }, 'Error handling resource read');
-      targetServer.recordTimeout(error);
+      isReconnected = await targetServer.recordTimeout(error);
       const errorMsg = String(error);
 
       // Log error response to client
@@ -759,6 +777,10 @@ export class ProxySession {
         duration: Date.now() - startTime,
         statusCode: 500,
       });
+
+      if (isReconnected == false && retryCount < 2) {
+        return await this.handleResourceRead(request, extra, retryCount + 1);
+      }
 
       throw error;
     } finally {
@@ -968,7 +990,8 @@ export class ProxySession {
    */
   private async handlePromptGet(
     request: GetPromptRequest,
-    extra: RequestHandlerExtra<any, any>
+    extra: RequestHandlerExtra<any, any>,
+    retryCount: number = 0
   ): Promise<GetPromptResult> {
     const promptName = request.params.name;
     this.logger.debug({ promptName }, 'Handling prompt get');
@@ -1066,6 +1089,8 @@ export class ProxySession {
       uniformRequestId: uniformRequestId
     };
 
+    let isReconnected: boolean | undefined;
+
     try {
       const requestCopy = JSON.parse(JSON.stringify(request));
       requestCopy.params.name = parseResult.originalName;
@@ -1078,23 +1103,28 @@ export class ProxySession {
         signal: extra.signal,  // Pass cancellation signal
         relatedRequestId: proxyRequestId  // Use proxyRequestId as related ID
       });
+      targetServerContext.clearTimeout();
 
-      // Log response
-      await this.sessionLogger.logClientRequest({
-        action: MCPEventLogType.ResponsePrompt,
-        serverId: targetServerContext.serverEntity.serverId,
-        upstreamRequestId: String(extra.requestId),
-        uniformRequestId: uniformRequestId,
-        requestParams: request.params,
-        responseResult: result,
-        duration: Date.now() - startTime,
-        statusCode: 200,
-      });
+      try {
+        // Log response
+        await this.sessionLogger.logClientRequest({
+          action: MCPEventLogType.ResponsePrompt,
+          serverId: targetServerContext.serverEntity.serverId,
+          upstreamRequestId: String(extra.requestId),
+          uniformRequestId: uniformRequestId,
+          requestParams: request.params,
+          responseResult: result,
+          duration: Date.now() - startTime,
+          statusCode: 200,
+        });
+      } catch (error) {
+        this.logger.error({ error }, 'Error logging prompt get response');
+      }
 
       return result;
     } catch (error) {
       this.logger.error({ error }, 'Error handling prompt get');
-      targetServerContext.recordTimeout(error);
+      isReconnected = await targetServerContext.recordTimeout(error);
       const errorMsg = String(error);
 
       await this.sessionLogger.logClientRequest({
@@ -1107,6 +1137,9 @@ export class ProxySession {
         duration: Date.now() - startTime,
         statusCode: 500,
       });
+      if (isReconnected == false && retryCount < 2) {
+        return await this.handlePromptGet(request, extra, retryCount + 1);
+      }
       throw error;
     } finally {
       // Clean up request mapping
@@ -1119,7 +1152,8 @@ export class ProxySession {
    */
   private async handleComplete(
     request: CompleteRequest,
-    extra: RequestHandlerExtra<any, any>
+    extra: RequestHandlerExtra<any, any>,
+    retryCount: number = 0
   ): Promise<CompleteResult> {
     this.logger.debug('Handling completion');
     const startTime = Date.now();
@@ -1236,29 +1270,36 @@ export class ProxySession {
       result.serverID
     );
 
+    let isReconnected: boolean | undefined;
+
     try {
       const result = await client.complete(requestCopy.params, {
         signal: extra.signal,
         relatedRequestId: proxyRequestId,
       });
+      targetServerContext.clearTimeout();
 
-      // Log response
-      await this.sessionLogger.logClientRequest({
-        action: action,
-        serverId: targetServerContext.serverEntity.serverId,
-        upstreamRequestId: String(extra.requestId),
-        uniformRequestId: uniformRequestId,
-        requestParams: request.params,
-        responseResult: result,
-        duration: Date.now() - startTime,
-        statusCode: 200,
-      });
+      try {
+        // Log response
+        await this.sessionLogger.logClientRequest({
+          action: action,
+          serverId: targetServerContext.serverEntity.serverId,
+          upstreamRequestId: String(extra.requestId),
+          uniformRequestId: uniformRequestId,
+          requestParams: request.params,
+          responseResult: result,
+          duration: Date.now() - startTime,
+          statusCode: 200,
+        });
+      } catch (error) {
+        this.logger.error({ error }, 'Error logging complete response');
+      }
 
       return result;
     } catch (error) {
       this.logger.error({ error }, 'Error handling complete');
-      targetServerContext.recordTimeout(error);
-      
+      isReconnected = await targetServerContext.recordTimeout(error);
+
       const errorMsg = String(error);
       this.sessionLogger.logClientRequest({
         action: action,
@@ -1270,6 +1311,10 @@ export class ProxySession {
         duration: Date.now() - startTime,
         statusCode: 500,
       });
+
+      if (isReconnected == false && retryCount < 2) {
+        return await this.handleComplete(request, extra, retryCount + 1);
+      }
       throw error;
     } finally {
       this.requestIdMapper.removeMapping(proxyRequestId);

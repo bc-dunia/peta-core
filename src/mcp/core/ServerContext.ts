@@ -32,7 +32,7 @@ export class ServerContext {
   lastSync: Date;
   connection: Client | undefined; // MCP SDK Server/Client object
   transport: Transport |  undefined;
-  readonly maxTimeoutCount: number = 5;
+  readonly maxTimeoutCount: number = 3;
   timeoutCount: number = 0;
   errorCount: number;
   lastError?: string;
@@ -236,14 +236,14 @@ export class ServerContext {
     this.status = newStatus;
   }
 
-  async recordTimeout(error: any): Promise<void> {
+  async recordTimeout(error: any): Promise<boolean | undefined> {
 
     if (!(error instanceof McpError)) {
-      return;
+      return undefined;
     }
 
     if (error.code !== ErrorCode.RequestTimeout) {
-      return;
+      return undefined;
     }
 
     this.timeoutCount += 1;
@@ -251,6 +251,7 @@ export class ServerContext {
     if (this.timeoutCount >= this.maxTimeoutCount) {
       try {
         this.connection?.ping({ timeout: 50000 });
+        this.clearTimeout();
       } catch (error) {
         if (error instanceof McpError && error.code === ErrorCode.RequestTimeout) {
           if (this.serverEntity.allowUserInput) {
@@ -261,9 +262,11 @@ export class ServerContext {
               await ServerManager.instance.reconnectServer(this.serverEntity, token);
             }
           }
+          return true;
         }
       }
     }
+    return false;
   }
 
   clearTimeout() {
