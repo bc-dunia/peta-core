@@ -522,6 +522,9 @@ export class ProxySession {
 
       return serverResult;
     } catch (error) {
+      this.logger.error({ error }, 'Error handling tool call');
+
+      targetServerContext?.recordTimeout(error);
       const errorMsg = String(error);
 
       // Create error result
@@ -741,6 +744,8 @@ export class ProxySession {
 
       return serverResult;
     } catch (error) {
+      this.logger.error({ error }, 'Error handling resource read');
+      targetServer.recordTimeout(error);
       const errorMsg = String(error);
 
       // Log error response to client
@@ -1088,6 +1093,8 @@ export class ProxySession {
 
       return result;
     } catch (error) {
+      this.logger.error({ error }, 'Error handling prompt get');
+      targetServerContext.recordTimeout(error);
       const errorMsg = String(error);
 
       await this.sessionLogger.logClientRequest({
@@ -1249,6 +1256,9 @@ export class ProxySession {
 
       return result;
     } catch (error) {
+      this.logger.error({ error }, 'Error handling complete');
+      targetServerContext.recordTimeout(error);
+      
       const errorMsg = String(error);
       this.sessionLogger.logClientRequest({
         action: action,

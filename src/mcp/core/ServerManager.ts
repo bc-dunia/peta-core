@@ -564,7 +564,7 @@ export class ServerManager {
     // First disconnect existing connection
     const context = await this.removeServer(serverEntity.serverId);
     context?.clearError();
-
+    context?.clearTimeout();
 
     // Recreate connection with new API key
     let serverContext;
@@ -584,6 +584,34 @@ export class ServerManager {
     await this.createServerConnection(serverContext, token);
 
     this.logger.info({ serverName: serverEntity.serverName }, 'Server reconnected with new API key');
+    return serverContext;
+  }
+
+  async reconnectTemporaryServer(serverEntity: Server, userId: string, token: string): Promise<ServerContext> {
+    const serverId = serverEntity.serverId;
+    const internalKey = `${serverId}:${userId}`;
+
+    let context = await this.closeTemporaryServer(serverEntity.serverId, userId);
+    context?.clearError();
+    context?.clearTimeout();
+
+    let serverContext;
+    if (context) {
+      serverContext = context;
+      serverContext.serverEntity = serverEntity;
+    } else {
+      serverContext = new ServerContext(serverEntity);
+      serverContext.userId = userId;
+      serverContext.userToken = token;
+    }
+    this.temporaryServers.set(internalKey, serverContext);
+
+    if (!this.temporaryServerLoggers.has(internalKey)) {
+      const serverLogger = new ServerLogger(internalKey);
+      this.temporaryServerLoggers.set(internalKey, serverLogger);
+    }
+
+    await this.createServerConnection(serverContext, token);
     return serverContext;
   }
   
@@ -790,16 +818,21 @@ export class ServerManager {
           client.setNotificationHandler(
             ToolListChangedNotificationSchema,
             async (notification: ToolListChangedNotification) => {
-              const tools = await client.listTools();
-              await serverContext.updateTools(tools);
-              this.globalRouter?.handleToolsListChanged(serverContext.serverEntity.serverId);
-
-              // Log ServerCapabilityUpdate (1313)
-              const serverLogger = this.serverLoggers.get(serverContext.serverEntity.serverId);
-              if (serverLogger) {
-                await serverLogger.logServerCapabilityUpdate({
-                  requestParams: { type: 'tools/listChanged', toolsCount: tools.tools?.length || 0 }
-                });
+              try {
+                const tools = await client.listTools();
+                await serverContext.updateTools(tools);
+                this.globalRouter?.handleToolsListChanged(serverContext.serverEntity.serverId);
+  
+                // Log ServerCapabilityUpdate (1313)
+                const serverLogger = this.serverLoggers.get(serverContext.serverEntity.serverId);
+                if (serverLogger) {
+                  await serverLogger.logServerCapabilityUpdate({
+                    requestParams: { type: 'tools/listChanged', toolsCount: tools.tools?.length || 0 }
+                  });
+                }
+              } catch (error) {
+                serverContext.recordTimeout(error);
+                this.logger.warn({ error, serverName: serverContext.serverEntity.serverName }, 'Failed to get tools');
               }
             }
           );
@@ -809,18 +842,23 @@ export class ServerManager {
           client.setNotificationHandler(
             ResourceListChangedNotificationSchema,
             async (notification: ResourceListChangedNotification) => {
-              const resources = await client.listResources();
-              await serverContext.updateResources(resources);
-              const resourceTemplates = await client.listResourceTemplates();
-              await serverContext.updateResourceTemplates(resourceTemplates);
-              this.globalRouter?.handleResourcesListChanged(serverContext.serverEntity.serverId);
-
-              // Log ServerCapabilityUpdate (1313)
-              const serverLogger = this.serverLoggers.get(serverContext.serverEntity.serverId);
-              if (serverLogger) {
-                await serverLogger.logServerCapabilityUpdate({
-                  requestParams: { type: 'resources/listChanged', resourcesCount: resources.resources?.length || 0 }
-                });
+              try {
+                const resources = await client.listResources();
+                await serverContext.updateResources(resources);
+                const resourceTemplates = await client.listResourceTemplates();
+                await serverContext.updateResourceTemplates(resourceTemplates);
+                this.globalRouter?.handleResourcesListChanged(serverContext.serverEntity.serverId);
+  
+                // Log ServerCapabilityUpdate (1313)
+                const serverLogger = this.serverLoggers.get(serverContext.serverEntity.serverId);
+                if (serverLogger) {
+                  await serverLogger.logServerCapabilityUpdate({
+                    requestParams: { type: 'resources/listChanged', resourcesCount: resources.resources?.length || 0 }
+                  });
+                }
+              } catch (error) {
+                serverContext.recordTimeout(error);
+                this.logger.warn({ error, serverName: serverContext.serverEntity.serverName }, 'Failed to get resources');
               }
             }
           );
@@ -839,16 +877,22 @@ export class ServerManager {
           client.setNotificationHandler(
             PromptListChangedNotificationSchema,
             async (notification: PromptListChangedNotification) => {
-              const prompts = await client.listPrompts();
-              await serverContext.updatePrompts(prompts);
-              this.globalRouter?.handlePromptsListChanged(serverContext.serverEntity.serverId);
 
-              // Log ServerCapabilityUpdate (1313)
-              const serverLogger = this.serverLoggers.get(serverContext.serverEntity.serverId);
-              if (serverLogger) {
-                await serverLogger.logServerCapabilityUpdate({
-                  requestParams: { type: 'prompts/listChanged', promptsCount: prompts.prompts?.length || 0 }
-                });
+              try {
+                const prompts = await client.listPrompts();
+                await serverContext.updatePrompts(prompts);
+                this.globalRouter?.handlePromptsListChanged(serverContext.serverEntity.serverId);
+  
+                // Log ServerCapabilityUpdate (1313)
+                const serverLogger = this.serverLoggers.get(serverContext.serverEntity.serverId);
+                if (serverLogger) {
+                  await serverLogger.logServerCapabilityUpdate({
+                    requestParams: { type: 'prompts/listChanged', promptsCount: prompts.prompts?.length || 0 }
+                  });
+                }
+              } catch (error) {
+                serverContext.recordTimeout(error);
+                this.logger.warn({ error, serverName: serverContext.serverEntity.serverName }, 'Failed to get prompts');
               }
             }
           );
@@ -1927,7 +1971,7 @@ export class ServerManager {
    * @param serverId Original serverId
    * @param userId User ID
    */
-  async closeTemporaryServer(serverId: string, userId: string): Promise<void> {
+  async closeTemporaryServer(serverId: string, userId: string): Promise<ServerContext | undefined> {
     const internalKey = `${serverId}:${userId}`;
     const serverContext = this.temporaryServers.get(internalKey);
 
@@ -1952,7 +1996,9 @@ export class ServerManager {
       this.temporaryServers.delete(internalKey);
       this.temporaryServerLoggers.delete(internalKey);
       this.logger.info({ internalKey }, 'Temporary server closed');
+      return serverContext;
     }
+    return undefined;
   }
 
   /**

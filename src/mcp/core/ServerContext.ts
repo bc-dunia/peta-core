@@ -1,13 +1,14 @@
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { DangerLevel, ServerStatus } from '../../types/enums.js';
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { ListPromptsResult, ListResourcesResult, ListToolsResult, ServerCapabilities, Tool, Resource, Prompt, ListResourceTemplatesResult, ResourceTemplate } from "@modelcontextprotocol/sdk/types.js";
+import { ListPromptsResult, ListResourcesResult, ListToolsResult, ServerCapabilities, Tool, Resource, Prompt, ListResourceTemplatesResult, ResourceTemplate, McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { Server } from '@prisma/client';
 import { ServerConfigCapabilities, ToolCapabilityConfig, ResourceCapabilityConfig, PromptCapabilityConfig, ServerConfigWithEnabled } from '../types/mcp.js';
 import { CapabilitiesService } from "../services/CapabilitiesService.js";
 import { IAuthStrategy, TokenInfo } from '../auth/IAuthStrategy.js';
 import { createLogger } from '../../logger/index.js';
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { ServerManager } from "./ServerManager.js";
 
 /**
  * Downstream Server context object
@@ -31,6 +32,8 @@ export class ServerContext {
   lastSync: Date;
   connection: Client | undefined; // MCP SDK Server/Client object
   transport: Transport |  undefined;
+  readonly maxTimeoutCount: number = 5;
+  timeoutCount: number = 0;
   errorCount: number;
   lastError?: string;
 
@@ -231,6 +234,40 @@ export class ServerContext {
 
   updateStatus(newStatus: ServerStatus) {
     this.status = newStatus;
+  }
+
+  async recordTimeout(error: any): Promise<void> {
+
+    if (!(error instanceof McpError)) {
+      return;
+    }
+
+    if (error.code !== ErrorCode.RequestTimeout) {
+      return;
+    }
+
+    this.timeoutCount += 1;
+
+    if (this.timeoutCount >= this.maxTimeoutCount) {
+      try {
+        this.connection?.ping({ timeout: 50000 });
+      } catch (error) {
+        if (error instanceof McpError && error.code === ErrorCode.RequestTimeout) {
+          if (this.serverEntity.allowUserInput) {
+            await ServerManager.instance.reconnectTemporaryServer(this.serverEntity, this.userId!, this.userToken!);
+          } else {
+            const token = ServerManager.instance.getOwnerToken();
+            if (token) {
+              await ServerManager.instance.reconnectServer(this.serverEntity, token);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  clearTimeout() {
+    this.timeoutCount = 0;
   }
 
   recordError(error: string) {
