@@ -188,11 +188,10 @@ export class ClientSession {
 
           // Start temporary server
           const serverContext = await ServerManager.instance.createTemporaryServer(
-            serverId,
             this.userId,
             tempServerEntity,
             this.token,
-            // true
+            true
           );
 
           if (serverContext.tools?.tools?.length ?? 0 > 0) {

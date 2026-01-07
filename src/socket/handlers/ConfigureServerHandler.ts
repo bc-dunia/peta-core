@@ -106,7 +106,6 @@ export class ConfigureServerHandler {
     };
 
     const serverContext = await ServerManager.instance.createTemporaryServer(
-      serverId,
       userId,
       tempServerEntity,
       userToken

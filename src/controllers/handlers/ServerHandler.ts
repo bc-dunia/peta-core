@@ -293,7 +293,16 @@ export class ServerHandler {
       }
     } else if (existingServer.enabled === true && updateData.enabled === false) {
       // Server changed from enabled to disabled
-      serverContext = await this.serverManager.removeServer(serverId);
+      if (existingServer.allowUserInput) {
+        const temporaryServers = this.serverManager.getTemporaryServers(serverId);
+        if (temporaryServers.length > 0) {
+          serverContext = temporaryServers[0];
+        }
+        await this.serverManager.closeAllTemporaryServersByTemplate(serverId);
+      } else {
+        serverContext = await this.serverManager.removeServer(serverId);
+      }
+
     } else if (existingServer.enabled === false && updateData.enabled === true) {
       // Server changed from disabled to enabled
       serverContext = await this.serverManager.addServer(serverId, token);

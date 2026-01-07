@@ -140,7 +140,7 @@ export class ServerManager {
    */
   getOwnerToken(): string {
     if (!this.ownerToken) {
-      throw new Error('Owner token not available. Please ensure Owner has accessed the API at least once.');
+      throw new McpError(ErrorCode.InvalidParams, 'Owner token not available. Please ensure Owner has accessed the API at least once.');
     }
     return this.ownerToken;
   }
@@ -159,25 +159,18 @@ export class ServerManager {
     
     let context = this.getServerContext(serverId, userId);
 
+    if (!context) {
+      throw new McpError(ErrorCode.InvalidParams, `Server ${serverId} not found in server contexts`);
+    }
+
     // Case 1: Server is online, update last activity time
-    if (context?.status === ServerStatus.Online) {
+    if (context.status === ServerStatus.Online) {
       context.lastActive = Date.now();
       return context;
     }
 
-    let serverEntity: Server;
-    if (context) {
-      serverEntity = context.serverEntity;
-    } else {
-      const server = await ServerRepository.findByServerId(serverId);
-      if (!server) {
-        throw new Error(`Server ${serverId} not found in database`);
-      }
-      serverEntity = server;
-    }
-
     let key: string;
-    if (serverEntity.allowUserInput) {
+    if (context.serverEntity.allowUserInput) {
       key = `${serverId}:${userId}`;
     } else {
       key = serverId;
@@ -191,15 +184,15 @@ export class ServerManager {
     }
 
     // Case 3: Server is sleeping, offline, or doesn't exist - need to start
-    if (!context || context.status === ServerStatus.Sleeping || context.status === ServerStatus.Offline) {
+    if (context.status === ServerStatus.Sleeping || context.status === ServerStatus.Offline) {
       // Create start promise and add to queue (prevent concurrent starts)
-      const startPromise = this.wakeupServer(serverEntity, userId);
+      const startPromise = this.wakeupServer(context, userId);
       this.serverWaitQueues.set(key, startPromise);
 
       try {
-        const result = await startPromise;
-        result.lastActive = Date.now();
-        return result;
+        await startPromise;
+        context.lastActive = Date.now();
+        return context;
       } finally {
         // Clean up queue after start completes
         this.serverWaitQueues.delete(key);
@@ -214,30 +207,33 @@ export class ServerManager {
     }
 
     // Case 5: Server is in error state
-    throw new Error(`Server ${serverId} is in error state: ${context?.lastError || 'Unknown error'}`);
+    throw new  McpError(ErrorCode.InvalidParams, `Server ${serverId} is in error state: ${context?.lastError || 'Unknown error'}`);
   }
 
   /**
    * Wake up sleeping server
    */
   private async wakeupServer(
-    serverEntity: Server,
+    context: ServerContext,
     userId?: string
   ): Promise<ServerContext> {
-    const serverId = serverEntity.serverId;
-    this.logger.info({ serverId, userId }, 'Waking up server from sleep');
+    const serverId = context.serverEntity.serverId;
+    this.logger.info({ serverName: context.serverEntity.serverName, serverId, userId }, 'Waking up server from sleep');
 
     // Check if lazy start is applicable
-    if (!this.isLazyStartApplicable(serverEntity)) {
-      throw new Error(`Server ${serverId} does not support lazy start`);
+    if (!this.isLazyStartApplicable(context.serverEntity)) {
+      throw new McpError(ErrorCode.InvalidParams, `Server ${context.serverEntity.serverName} does not support lazy start`);
     }
 
     // Get token
     let token: string;
-    if (userId && serverEntity.allowUserInput) {
+    if (context.serverEntity.allowUserInput) {
+      if (!userId) {
+        throw new McpError(ErrorCode.InvalidParams, 'User ID is required for temporary servers');
+      }
       const session = this.sessionStore?.getUserFirstSession(userId);
       if (!session) {
-        throw new Error(`User ${userId} has no active session`);
+        throw new McpError(ErrorCode.InvalidParams, `User ${userId} has no active session`);
       }
       token = session.token;
     } else {
@@ -246,7 +242,8 @@ export class ServerManager {
 
     // Start server with error handling
     try {
-      const context = await this.addServer(serverEntity, token);
+      await this.createServerConnection(context, token);
+
       this.logger.info({
         serverId,
         userId,
@@ -257,15 +254,12 @@ export class ServerManager {
     } catch (error) {
       this.logger.error({ error, serverId, userId }, 'Failed to wake up server');
 
-      // Set error status
-      const context = this.getServerContext(serverId, userId);
-      if (context) {
-        context.status = ServerStatus.Error;
-        context.lastError = error instanceof Error ? error.message : String(error);
+      if (error instanceof McpError) {
+        throw error;
       }
 
       // Throw error to let caller handle
-      throw error;
+      throw new McpError(ErrorCode.InternalError, String(error));
     }
   }
 
@@ -313,8 +307,9 @@ export class ServerManager {
       return false;
     }
 
-    // Only applicable for stdio type
-    return server.transportType === 'stdio';
+    // // Only applicable for stdio type
+    // return server.transportType === 'stdio';
+    return true;
   }
 
   /**
@@ -373,6 +368,10 @@ export class ServerManager {
       return false;
     }
 
+    if (context.serverEntity.transportType !== 'stdio') {
+      return false;
+    }
+
     // Check if exceeded idle time
     const idleTime = now - context.lastActive;
     return idleTime >= this.IDLE_TIMEOUT;
@@ -404,9 +403,6 @@ export class ServerManager {
       }, 'Server transitioned to sleeping state');
     } catch (error) {
       this.logger.error({ error, serverName: context.serverEntity.serverName }, 'Failed to put server to sleep');
-      // On failure, mark as error state
-      context.status = ServerStatus.Error;
-      context.lastError = error instanceof Error ? error.message : String(error);
     }
   }
 
@@ -566,10 +562,18 @@ export class ServerManager {
    */
   async reconnectServer(serverEntity: Server, token: string): Promise<ServerContext> {
     // First disconnect existing connection
-    await this.removeServer(serverEntity.serverId);
+    const context = await this.removeServer(serverEntity.serverId);
+    context?.clearError();
+
 
     // Recreate connection with new API key
-    const serverContext = new ServerContext(serverEntity);
+    let serverContext;
+    if (context) {
+      serverContext = context;
+      serverContext.serverEntity = serverEntity;
+    } else {
+      serverContext = new ServerContext(serverEntity);
+    }
     this.serverContexts.set(serverEntity.serverId, serverContext);
 
     if (!this.serverLoggers.has(serverEntity.serverId)) {
@@ -694,10 +698,13 @@ export class ServerManager {
         const affectedSessions = this.sessionStore?.getSessionsUsingServer(serverEntity.serverId) ?? [];
         
         serverContext.status = ServerStatus.Error;
-        serverContext.lastError = `Transport closed by server`;
-        serverContext.errorCount++;
+        serverContext.recordError(`Transport closed by server`);
 
-        this.removeServer(serverEntity.serverId);
+        if (serverEntity.allowUserInput) {
+          this.closeTemporaryServer(serverEntity.serverId, serverContext.userId!);
+        } else {
+          this.removeServer(serverEntity.serverId);
+        }
 
         this.notifyUsersOfServerChange(serverEntity.serverId, affectedSessions, 'server_error', {
           toolsChanged: (serverContext.tools?.tools?.length ?? 0) > 0,
@@ -753,8 +760,7 @@ export class ServerManager {
     } catch (error) {
       this.logger.warn({ error, serverName: serverEntity.serverName }, 'Failed to get capabilities');
       serverContext.status = ServerStatus.Error;
-      serverContext.lastError = error instanceof Error ? error.message : `${error}`;
-      serverContext.errorCount++;
+      serverContext.recordError(String(error));
 
       throw error;
     }
@@ -1832,12 +1838,12 @@ export class ServerManager {
    * @returns ServerContext
    */
   async createTemporaryServer(
-    serverId: string,
     userId: string,
     serverEntity: Server,
     token: string,
     sleep: boolean = false,
   ): Promise<ServerContext> {
+    const serverId = serverEntity.serverId;
     const internalKey = `${serverId}:${userId}`;
 
     // Check if already exists
@@ -1864,7 +1870,6 @@ export class ServerManager {
     } else {
       // Establish connection
       await this.createServerConnection(serverContext, token);
-      serverContext.status = ServerStatus.Online;
     }
     
     this.logger.info({ internalKey, status: serverContext.status }, 'Temporary server created');
@@ -1880,6 +1885,15 @@ export class ServerManager {
   getTemporaryServer(serverId: string, userId: string): ServerContext | undefined {
     const internalKey = `${serverId}:${userId}`;
     return this.temporaryServers.get(internalKey);
+  }
+
+  /**
+   * Get all temporary servers for a template
+   * @param serverId Template serverId
+   * @returns ServerContext[]
+   */
+  getTemporaryServers(serverId: string): ServerContext[] {
+    return Array.from(this.temporaryServers.values()).filter((context) => context.serverEntity.serverId === serverId);
   }
 
   /**
