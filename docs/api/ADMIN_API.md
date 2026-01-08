@@ -549,6 +549,8 @@ null
 - `toolTmplId` (string, optional): Tool template ID, defaults to `null`
 - `authType` (number, required): Server authorization type, defaults to 1, API Key authentication, 2 Google OAuth authentication
 - `configTemplate` (string, optional): Tool template, required when allowUserInput == true
+- `category` (number, required): Server category。1: template server, 2: custom remote server, 3: RESTful API server
+- `lazyStartEnabled` (boolean, optional): Enable lazy loading for this server. When true, server loads into memory but delays startup until first use, and auto-shuts down when idle. Defaults to `true`
 
 **Return Result** (data):
 ```json
@@ -603,6 +605,7 @@ null
 - `launchConfig` (string, optional): Launch configuration, JSON configuration encrypted with owner token, cannot update when allowUserInput == true
 - `capabilities` (string or object, optional): Capability configuration, cannot update when allowUserInput == true
 - `enabled` (boolean, optional): Whether enabled
+- `lazyStartEnabled` (boolean, optional): Enable lazy loading for this server. When true, server loads into memory but delays startup until first use, and auto-shuts down when idle
 
 **Return Result** (data):
 ```json

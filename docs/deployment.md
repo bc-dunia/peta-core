@@ -162,6 +162,12 @@ OAuth 2.0 and multi-tenant settings are also configured via environment variable
 | `LOG_LEVEL`  |          | `trace` (dev), `info` (prod) | Log level: `trace`, `debug`, `info`, `warn`, `error`. |
 | `LOG_PRETTY` |          | `true` (dev), `false` (prod) | Enable pretty-printed logs in development.            |
 
+#### MCP Server Management
+
+| Name                  | Required | Default | Description                                                                                      |
+| --------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------ |
+| `LAZY_START_ENABLED`  |          | `true`  | Enable lazy loading for MCP servers. When true, servers load config but delay startup until first use; idle servers auto-shutdown. |
+
 #### Cloudflared DDNS (optional)
 
 | Name               | Required | Default | Description                                         |

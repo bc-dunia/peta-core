@@ -203,6 +203,7 @@ services:
       JWT_SECRET: \${JWT_SECRET}
       LOG_LEVEL: \${LOG_LEVEL}
       LOG_PRETTY: \${LOG_PRETTY}
+      LAZY_START_ENABLED: \${LAZY_START_ENABLED}
       CLOUDFLARED_CONTAINER_NAME: \${CLOUDFLARED_CONTAINER_NAME}
       PETA_CORE_IN_DOCKER: "true"
       # Skip database container startup (database is started via docker-compose)
@@ -280,6 +281,11 @@ JWT_SECRET=${JWT_SECRET}
 LOG_LEVEL=info
 LOG_PRETTY=false
 LOG_RESPONSE_MAX_LENGTH=300
+
+# -------------------- MCP Server Management --------------------
+# Lazy loading: Servers load config but delay startup until first use
+# Idle servers auto-shutdown to conserve resources
+LAZY_START_ENABLED=true
 
 # -------------------- Cloudflared Configuration --------------------
 CLOUDFLARED_CONTAINER_NAME=peta-core-cloudflared

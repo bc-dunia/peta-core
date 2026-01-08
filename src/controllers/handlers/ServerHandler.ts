@@ -6,7 +6,7 @@ import { AdminRequest, AdminError, AdminErrorCode } from '../../types/admin.type
 import { Server } from '@prisma/client';
 import { prisma } from '../../config/prisma.js';
 import { LogService } from '../../log/LogService.js';
-import { MCPEventLogType, ServerCategory } from '../../types/enums.js';
+import { MCPEventLogType, ServerCategory, ServerStatus } from '../../types/enums.js';
 import { socketNotifier } from '../../socket/SocketNotifier.js';
 import { ServerContext } from '../../mcp/core/ServerContext.js';
 import { Permissions } from '../../mcp/types/mcp.js';
@@ -150,7 +150,7 @@ export class ServerHandler {
    * Create server (2010)
    */
   async handleCreateServer(request: AdminRequest<any>): Promise<any> {
-    const { serverId, serverName, enabled, launchConfig, capabilities, createdAt, updatedAt, allowUserInput, proxyId, toolTmplId, authType, configTemplate, category } = request.data;
+    const { serverId, serverName, enabled, launchConfig, capabilities, createdAt, updatedAt, allowUserInput, proxyId, toolTmplId, authType, configTemplate, category, lazyStartEnabled } = request.data;
 
     if (!serverId) {
       throw new AdminError('Missing required field: serverId', AdminErrorCode.INVALID_REQUEST);
@@ -196,7 +196,8 @@ export class ServerHandler {
       toolTmplId: toolTmplId ?? null,
       authType: authType ?? 1,
       configTemplate: configTemplate || '{}',
-      category: category ?? ServerCategory.Template
+      category: category,
+      lazyStartEnabled: lazyStartEnabled
     });
 
     // Log admin operation
@@ -237,7 +238,7 @@ export class ServerHandler {
    * Update server (2012)
    */
   async handleUpdateServer(request: AdminRequest<any>, token: string): Promise<any> {
-    const { serverId, serverName, launchConfig, capabilities, enabled, allowUserInput, configTemplate } = request.data;
+    const { serverId, serverName, launchConfig, capabilities, enabled, allowUserInput, configTemplate, lazyStartEnabled } = request.data;
 
     if (!serverId) {
       throw new AdminError('Missing required field: serverId', AdminErrorCode.INVALID_REQUEST);
@@ -272,6 +273,9 @@ export class ServerHandler {
     if (existingServer.category === ServerCategory.RestApi && configTemplate !== undefined) {
       updateData.configTemplate = configTemplate;
     }
+    if (lazyStartEnabled !== undefined) {
+      updateData.lazyStartEnabled = lazyStartEnabled;
+    }
 
     const updatedCapabilities = await this.getUpdatedCapabilities(capabilities, existingServer.capabilities);
     if (updatedCapabilities) {
@@ -287,7 +291,25 @@ export class ServerHandler {
       if (updateData.capabilities !== undefined && updateData.launchConfig !== undefined) {
         this.updateServerLaunchConfig(serverId, updateData.launchConfig, token);
       } else if (updateData.capabilities !== undefined) {
-        this.updateServerCapabilities(serverId, updateData.capabilities);
+        await this.updateServerCapabilities(serverId, updateData.capabilities);
+        
+        if (updateData.lazyStartEnabled === false && existingServer.lazyStartEnabled === true) {
+          if (existingServer.allowUserInput) {
+            const temporaryServers = this.serverManager.getTemporaryServers(serverId);
+
+            for (const temporaryServer of temporaryServers) {
+              if (temporaryServer.status === ServerStatus.Sleeping && this.serverManager.getOwnerToken()) {
+                this.serverManager.reconnectTemporaryServer(temporaryServer.serverEntity, temporaryServer.userId!, temporaryServer.userToken!);
+              }
+            }
+
+          } else {
+            serverContext = this.serverManager.getServerContext(serverId);
+            if (serverContext?.status === ServerStatus.Sleeping && this.serverManager.getOwnerToken()) {
+              this.serverManager.reconnectServer(serverContext.serverEntity, this.serverManager.getOwnerToken());
+            }
+          }
+        }
       } else if (updateData.launchConfig !== undefined) {
         this.updateServerLaunchConfig(serverId, updateData.launchConfig, token);
       }

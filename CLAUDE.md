@@ -373,6 +373,7 @@ Optional:
 - `ENABLE_HTTPS=true` - Enable HTTPS server
 - `SSL_CERT_PATH`, `SSL_KEY_PATH` - Custom certificate paths
 - `SKIP_CLOUDFLARED=true` - Skip Cloudflared setup in dev
+- `LAZY_START_ENABLED` - Enable lazy loading for MCP servers (default: true)
 - `LOG_LEVEL` - Log level (trace, debug, info, warn, error, fatal)
 - `LOG_PRETTY` - Pretty-print logs in development
 

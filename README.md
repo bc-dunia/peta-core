@@ -106,6 +106,7 @@ Peta Core provides the runtime layer of the MCP Control Plane: secure credential
 ### 1) Managed MCP Gateway & Runtime
 - **Transparent MCP proxying.** Acts as an MCP server upstream and an MCP client downstream — no custom extensions required.
 - **Multi-server routing.** Mount multiple downstream MCP servers behind one stable endpoint (e.g. `serverId::toolName`).
+- **Lazy loading (optional).** Load server configurations into memory without startup; servers launch on-demand and auto-shutdown when idle to optimize resource usage.
 - **Downstream lifecycle (optional).** Run/monitor downstream servers with health checks and lifecycle hooks when needed.
 
 ### 2) Secure Vault & Server-side Credential Injection
