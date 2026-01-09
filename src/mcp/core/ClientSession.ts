@@ -236,12 +236,14 @@ export class ClientSession {
     if (!serverContext) return false;
     if (!serverContext.serverEntity.enabled) return false;
     if (serverContext.status !== ServerStatus.Online && serverContext.status !== ServerStatus.Sleeping) return false;
+
+    const serverPermsEnabled = this.permissions[serverID]?.enabled ?? serverContext.serverEntity.publicAccess;
     const userPreferencesEnabled = this.userPreferences[serverID]?.enabled ?? true;
+
     if (serverContext.serverEntity.allowUserInput) {
       if (serverContext.userId !== this.userId) return false;
-      return userPreferencesEnabled;
+      return serverPermsEnabled && userPreferencesEnabled;
     } else {
-      const serverPermsEnabled = this.permissions[serverID]?.enabled ?? true;
       return serverPermsEnabled && userPreferencesEnabled;
     }
   }

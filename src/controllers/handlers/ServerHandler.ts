@@ -13,6 +13,7 @@ import { Permissions } from '../../mcp/types/mcp.js';
 import UserRepository from '../../repositories/UserRepository.js';
 import { ClientSession } from '../../mcp/core/ClientSession.js';
 import { createLogger } from '../../logger/index.js';
+import { CapabilitiesService } from '../../mcp/services/CapabilitiesService.js';
 
 /**
  * Server operation handler (2000-2999)
@@ -150,7 +151,7 @@ export class ServerHandler {
    * Create server (2010)
    */
   async handleCreateServer(request: AdminRequest<any>): Promise<any> {
-    const { serverId, serverName, enabled, launchConfig, capabilities, createdAt, updatedAt, allowUserInput, proxyId, toolTmplId, authType, configTemplate, category, lazyStartEnabled } = request.data;
+    const { serverId, serverName, enabled, launchConfig, capabilities, createdAt, updatedAt, allowUserInput, proxyId, toolTmplId, authType, configTemplate, category, lazyStartEnabled, publicAccess } = request.data;
 
     if (!serverId) {
       throw new AdminError('Missing required field: serverId', AdminErrorCode.INVALID_REQUEST);
@@ -197,7 +198,8 @@ export class ServerHandler {
       authType: authType ?? 1,
       configTemplate: configTemplate || '{}',
       category: category,
-      lazyStartEnabled: lazyStartEnabled
+      lazyStartEnabled: lazyStartEnabled,
+      publicAccess: publicAccess ?? false
     });
 
     // Log admin operation
@@ -230,7 +232,8 @@ export class ServerHandler {
       toolTmplId: true,
       authType: true,
       category: true,
-      lazyStartEnabled: true
+      lazyStartEnabled: true,
+      publicAccess: true
     };
 
     // Exact query for specific server
@@ -267,7 +270,7 @@ export class ServerHandler {
    * Update server (2012)
    */
   async handleUpdateServer(request: AdminRequest<any>, token: string): Promise<any> {
-    const { serverId, serverName, launchConfig, capabilities, enabled, allowUserInput, configTemplate, lazyStartEnabled } = request.data;
+    const { serverId, serverName, launchConfig, capabilities, enabled, allowUserInput, configTemplate, lazyStartEnabled, publicAccess } = request.data;
 
     if (!serverId) {
       throw new AdminError('Missing required field: serverId', AdminErrorCode.INVALID_REQUEST);
@@ -305,6 +308,9 @@ export class ServerHandler {
     if (lazyStartEnabled !== undefined) {
       updateData.lazyStartEnabled = lazyStartEnabled;
     }
+    if (publicAccess !== undefined) {
+      updateData.publicAccess = publicAccess;
+    }
 
     const updatedCapabilities = await this.getUpdatedCapabilities(capabilities, existingServer.capabilities);
     if (updatedCapabilities) {
@@ -312,7 +318,11 @@ export class ServerHandler {
     }
     updateData.enabled = enabled ?? existingServer.enabled;
 
+    // Check if publicAccess will change
+    const willHandlePublicAccessChange = publicAccess !== undefined && publicAccess !== existingServer.publicAccess;
+
     let server = await ServerRepository.update(serverId, updateData);
+
     let serverContext: ServerContext | undefined;
     const affectedSessions = this.sessionStore.getSessionsUsingServer(serverId);
     if (existingServer.enabled === true && updateData.enabled === true) {
@@ -321,11 +331,25 @@ export class ServerHandler {
         this.updateServerLaunchConfig(serverId, updateData.launchConfig, token);
       } else if (updateData.capabilities !== undefined) {
         await this.updateServerCapabilities(serverId, updateData.capabilities);
-        serverContext = await this.updateLazyStartEnabled(existingServer, updateData.lazyStartEnabled);
+        serverContext = await this.updateLazyStartEnabled(existingServer, server, updateData.lazyStartEnabled);
       } else if (updateData.launchConfig !== undefined) {
         this.updateServerLaunchConfig(serverId, updateData.launchConfig, token);
       } else if (updateData.lazyStartEnabled !== undefined) {
-        serverContext = await this.updateLazyStartEnabled(existingServer, updateData.lazyStartEnabled);
+        serverContext = await this.updateLazyStartEnabled(existingServer, server, updateData.lazyStartEnabled);
+      }
+      if (!serverContext && willHandlePublicAccessChange) {
+        if (existingServer.allowUserInput) {
+          const temporaryServers = this.serverManager.getTemporaryServers(serverId);
+          for (const temporaryServer of temporaryServers) {
+            temporaryServer.serverEntity.publicAccess = publicAccess;
+            serverContext = temporaryServer;
+          }
+        } else {
+          serverContext = this.serverManager.getServerContext(serverId);
+          if (serverContext) {
+            serverContext.serverEntity.publicAccess = publicAccess;
+          }
+        }
       }
     } else if (existingServer.enabled === true && updateData.enabled === false) {
       // Server changed from enabled to disabled
@@ -627,7 +651,7 @@ export class ServerHandler {
     await this.notifyUsersOfServerChangeByServerContext(serverContext, this.sessionStore.getSessionsUsingServer(targetId), 'launch_cmd_updated');
   }
 
-  private async updateLazyStartEnabled(existingServer: Server, lazyStartEnabled?: boolean | undefined): Promise<ServerContext | undefined> {
+  private async updateLazyStartEnabled(existingServer: Server, newServer: Server, lazyStartEnabled?: boolean | undefined): Promise<ServerContext | undefined> {
 
     if (lazyStartEnabled === undefined) {
       return undefined;
@@ -643,7 +667,7 @@ export class ServerHandler {
       const temporaryServers = this.serverManager.getTemporaryServers(serverId);
 
       for (const temporaryServer of temporaryServers) {
-        temporaryServer.serverEntity.lazyStartEnabled = lazyStartEnabled;
+        temporaryServer.serverEntity = newServer;
         if (lazyStartEnabled === false && existingServer.lazyStartEnabled === true) {
           if (temporaryServer.status === ServerStatus.Sleeping && this.serverManager.getOwnerToken()) {
             this.serverManager.reconnectTemporaryServer(temporaryServer.serverEntity, temporaryServer.userId!, temporaryServer.userToken!);
@@ -653,7 +677,7 @@ export class ServerHandler {
     } else {
       const context = this.serverManager.getServerContext(serverId);
       if (context) {
-        context.serverEntity.lazyStartEnabled = lazyStartEnabled;
+        context.serverEntity = newServer;
         if (lazyStartEnabled === false && existingServer.lazyStartEnabled === true) {
           if (context.status === ServerStatus.Sleeping && this.serverManager.getOwnerToken()) {
             this.serverManager.reconnectServer(context.serverEntity, this.serverManager.getOwnerToken());

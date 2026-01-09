@@ -53,6 +53,7 @@ model Server {
   toolTmplId     String? @map("tool_tmpl_id") @db.VarChar(128)
   authType       Int     @default(1) @map("auth_type")
   category       Int     @default(1) @map("category")
+  publicAccess   Boolean @default(false) @map("public_access")
 
   // ========== Lazy Start related fields ==========
   transportType        String?  @map("transport_type") @db.VarChar(10)  // 'stdio' | 'http' | 'sse'
