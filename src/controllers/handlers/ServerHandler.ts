@@ -215,9 +215,30 @@ export class ServerHandler {
   async handleGetServers(request: AdminRequest<any>): Promise<any> {
     const { proxyId, enabled, serverId } = request.data || {};
 
+    // Select fields to exclude: transportType, cachedTools, cachedResources, cachedResourceTemplates, cachedPrompts
+    const select = {
+      serverId: true,
+      serverName: true,
+      enabled: true,
+      launchConfig: true,
+      capabilities: true,
+      createdAt: true,
+      updatedAt: true,
+      allowUserInput: true,
+      configTemplate: true,
+      proxyId: true,
+      toolTmplId: true,
+      authType: true,
+      category: true,
+      lazyStartEnabled: true
+    };
+
     // Exact query for specific server
     if (serverId) {
-      const server = await ServerRepository.findByServerId(serverId);
+      const server = await prisma.server.findUnique({
+        where: { serverId },
+        select
+      });
       return { servers: server ? [server] : [] };
     }
 
@@ -230,7 +251,7 @@ export class ServerHandler {
       where.enabled = enabled;
     }
 
-    const servers = await prisma.server.findMany({ where });
+    const servers = await prisma.server.findMany({ where, select });
     return { servers : servers };
   }
 
