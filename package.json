@@ -1,6 +1,6 @@
 {
   "name": "peta-core",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "Peta Core - Backend service for MCP protocol",
   "main": "dist/index.js",
