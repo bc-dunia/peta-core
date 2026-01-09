@@ -239,6 +239,9 @@ export class ServerHandler {
         where: { serverId },
         select
       });
+      if (server && server.category !== ServerCategory.RestApi) {
+        server.configTemplate = null;
+      }
       return { servers: server ? [server] : [] };
     }
 
@@ -252,6 +255,11 @@ export class ServerHandler {
     }
 
     const servers = await prisma.server.findMany({ where, select });
+    for (const server of servers) {
+      if (server.category !== ServerCategory.RestApi) {
+        server.configTemplate = null;
+      }
+    }
     return { servers : servers };
   }
 
@@ -313,26 +321,11 @@ export class ServerHandler {
         this.updateServerLaunchConfig(serverId, updateData.launchConfig, token);
       } else if (updateData.capabilities !== undefined) {
         await this.updateServerCapabilities(serverId, updateData.capabilities);
-        
-        if (updateData.lazyStartEnabled === false && existingServer.lazyStartEnabled === true) {
-          if (existingServer.allowUserInput) {
-            const temporaryServers = this.serverManager.getTemporaryServers(serverId);
-
-            for (const temporaryServer of temporaryServers) {
-              if (temporaryServer.status === ServerStatus.Sleeping && this.serverManager.getOwnerToken()) {
-                this.serverManager.reconnectTemporaryServer(temporaryServer.serverEntity, temporaryServer.userId!, temporaryServer.userToken!);
-              }
-            }
-
-          } else {
-            serverContext = this.serverManager.getServerContext(serverId);
-            if (serverContext?.status === ServerStatus.Sleeping && this.serverManager.getOwnerToken()) {
-              this.serverManager.reconnectServer(serverContext.serverEntity, this.serverManager.getOwnerToken());
-            }
-          }
-        }
+        serverContext = await this.updateLazyStartEnabled(existingServer, updateData.lazyStartEnabled);
       } else if (updateData.launchConfig !== undefined) {
         this.updateServerLaunchConfig(serverId, updateData.launchConfig, token);
+      } else if (updateData.lazyStartEnabled !== undefined) {
+        serverContext = await this.updateLazyStartEnabled(existingServer, updateData.lazyStartEnabled);
       }
     } else if (existingServer.enabled === true && updateData.enabled === false) {
       // Server changed from enabled to disabled
@@ -364,6 +357,13 @@ export class ServerHandler {
       action: MCPEventLogType.AdminServerEdit,
       requestParams: JSON.stringify({ serverId: serverId })
     });
+
+    server.configTemplate = null;
+    server.transportType = null;
+    server.cachedTools = null;
+    server.cachedResources = null;
+    server.cachedResourceTemplates = null;
+    server.cachedPrompts = null;
 
     return { server: server };
   }
@@ -625,6 +625,48 @@ export class ServerHandler {
     }
     await this.serverManager.reconnectServer(newServer, token);
     await this.notifyUsersOfServerChangeByServerContext(serverContext, this.sessionStore.getSessionsUsingServer(targetId), 'launch_cmd_updated');
+  }
+
+  private async updateLazyStartEnabled(existingServer: Server, lazyStartEnabled?: boolean | undefined): Promise<ServerContext | undefined> {
+
+    if (lazyStartEnabled === undefined) {
+      return undefined;
+    }
+    if (lazyStartEnabled === existingServer.lazyStartEnabled) {
+      return undefined;
+    }
+
+    const serverId = existingServer.serverId;
+    let serverContext: ServerContext | undefined;
+
+    if (existingServer.allowUserInput) {
+      const temporaryServers = this.serverManager.getTemporaryServers(serverId);
+
+      for (const temporaryServer of temporaryServers) {
+        temporaryServer.serverEntity.lazyStartEnabled = lazyStartEnabled;
+        if (lazyStartEnabled === false && existingServer.lazyStartEnabled === true) {
+          if (temporaryServer.status === ServerStatus.Sleeping && this.serverManager.getOwnerToken()) {
+            this.serverManager.reconnectTemporaryServer(temporaryServer.serverEntity, temporaryServer.userId!, temporaryServer.userToken!);
+          }
+        }
+      }
+    } else {
+      const context = this.serverManager.getServerContext(serverId);
+      if (context) {
+        context.serverEntity.lazyStartEnabled = lazyStartEnabled;
+        if (lazyStartEnabled === false && existingServer.lazyStartEnabled === true) {
+          if (context.status === ServerStatus.Sleeping && this.serverManager.getOwnerToken()) {
+            this.serverManager.reconnectServer(context.serverEntity, this.serverManager.getOwnerToken());
+          }
+        }
+      } else {
+        if (lazyStartEnabled === true && existingServer.lazyStartEnabled === false) {
+          serverContext = this.serverManager.addSleepingServer(existingServer);
+        }
+      }
+    }
+
+    return serverContext;
   }
 
   private async notifyUsersOfServerChangeByServerContext(serverContext: ServerContext | undefined, affectedSessions: ClientSession[], changeType: string): Promise<void> {

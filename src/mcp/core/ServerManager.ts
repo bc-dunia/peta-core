@@ -524,6 +524,31 @@ export class ServerManager {
     await this.createServerConnection(context, token);
     return context;
   }
+
+  addSleepingServer(server: Server): ServerContext | undefined {
+    if (server.allowUserInput) {
+      return undefined;
+    }
+
+    if (!this.isLazyStartApplicable(server)) {
+      return undefined;
+    }
+
+    if (this.serverContexts.has(server.serverId)) {
+      return this.serverContexts.get(server.serverId)!;
+    }
+
+    const context = new ServerContext(server);
+    this.serverContexts.set(server.serverId, context);
+
+    // Create ServerLogger for this server
+    const serverLogger = new ServerLogger(server.serverId);
+    this.serverLoggers.set(server.serverId, serverLogger);
+
+    // Initialize in Sleeping state, don't start
+    context.status = ServerStatus.Sleeping;
+    return context;
+  }
   
   /**
    * Remove server connection
