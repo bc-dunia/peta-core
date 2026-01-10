@@ -8,20 +8,15 @@ import { CapabilitiesService } from '../../mcp/services/CapabilitiesService.js';
 import { McpServerCapabilities } from '../../mcp/types/mcp.js';
 
 export class CapabilitiesHandler {
-  private capabilitiesService: CapabilitiesService;
-
-  constructor() {
-    // Get singleton instance (assumed to be initialized at application startup)
-    this.capabilitiesService = CapabilitiesService.getInstance();
-  }
 
   /**
    * Handle client request to get capability configuration
    * @param userId User ID
-   * @returns Promise<{ capabilities: McpServerCapabilities }>
+   * @returns Promise<McpServerCapabilities>
    */
-  async handleGetCapabilities(userId: string): Promise<{ capabilities: McpServerCapabilities }> {
-    const capabilities = await this.capabilitiesService.getUserCapabilities(userId);
-    return { capabilities };
+  static async handleGetCapabilities(userId: string): Promise<McpServerCapabilities> {
+    const capabilitiesService = CapabilitiesService.getInstance();
+    const capabilities = await capabilitiesService.getUserCapabilities(userId);
+    return capabilities;
   }
 }

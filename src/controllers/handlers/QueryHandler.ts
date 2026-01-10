@@ -30,13 +30,17 @@ export class QueryHandler {
       if (server.enabled === false) {
         continue;
       }
+
+      const enabled = server.enabled && server.publicAccess;
+
       if (capabilities[server.serverId]) {
+        capabilities[server.serverId].enabled = enabled;
         continue;
       }
 
-      const serverCapabilities = server.allowUserInput ? {} : JSON.parse(server.capabilities ?? '{}');
+      const serverCapabilities = JSON.parse(server.capabilities ?? '{}');
       capabilities[server.serverId] = {
-        enabled: server.enabled,
+        enabled: enabled,
         serverName: server.serverName,
         allowUserInput: server.allowUserInput,
         authType: server.authType,

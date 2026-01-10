@@ -242,13 +242,12 @@ export class SocketService {
       socket.on('get_capabilities', async (request: any) => {
         try {
           const { CapabilitiesHandler } = await import('../socket/handlers/CapabilitiesHandler.js');
-          const handler = new CapabilitiesHandler();
-          const result = await handler.handleGetCapabilities(userId);
+          const capabilities = await CapabilitiesHandler.handleGetCapabilities(userId);
 
           const response: SocketResponse = {
             requestId: request.requestId,
             success: true,
-            data: result,
+            data: { capabilities: capabilities },
             timestamp: Date.now()
           };
 
@@ -416,13 +415,9 @@ export class SocketService {
       // 7. Actively push capability configuration after successful connection
       (async () => {
         try {
-          const { CapabilitiesHandler } = await import('../socket/handlers/CapabilitiesHandler.js');
-          const handler = new CapabilitiesHandler();
-          const result = await handler.handleGetCapabilities(userId);
-
           // Use socketNotifier to push capability change notification
           const { socketNotifier } = await import('../socket/SocketNotifier.js');
-          socketNotifier.notifyPermissionChanged(userId, result.capabilities);
+          socketNotifier.notifyPermissionChangedByUser(userId);
 
           // Push online session information
           socketNotifier.notifyOnlineSessions(userId);

@@ -756,25 +756,4 @@ export class ClientSession {
       throw error;
     }
   }
-
-  /**
-   * Get session statistics
-   */
-  getStats(): {
-    sessionId: string;
-    userId: string;
-    lastActive: Date;
-    accessibleServers: string[];
-    uptime: number;
-  } {
-    return {
-      sessionId: this.sessionId,
-      userId: this.userId,
-      lastActive: this.lastActive,
-      accessibleServers: Object.keys(this.permissions).filter(
-        serverID => this.permissions[serverID].enabled ?? true
-      ),
-      uptime: Date.now() - this.lastActive.getTime()
-    };
-  }
 }

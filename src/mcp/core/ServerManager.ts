@@ -461,15 +461,14 @@ export class ServerManager {
     const availableServers = this.getAvailableServers();
     const result: ServerContext[] = [];
     for (const server of availableServers) {
-      if (server.serverEntity.allowUserInput) {
-        if (server.userId === user.userId) {
-          result.push(server);
-        }
-      } else {
-        if (permissions[server.serverEntity.serverId]?.enabled ?? true) {
-          result.push(server);
-        }
+      const enabled = permissions[server.serverEntity.serverId]?.enabled ?? server.serverEntity.publicAccess;
+      if (!enabled) {
+        continue;
       }
+      if (server.serverEntity.allowUserInput && server.userId !== user.userId) {
+        continue;
+      }
+      result.push(server);
     }
     return result;
   }

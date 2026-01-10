@@ -38,6 +38,7 @@ import { CapabilitiesService } from '../mcp/services/CapabilitiesService.js';
 import { SessionStore } from '../mcp/core/SessionStore.js';
 import { ClientSession } from '../mcp/core/ClientSession.js';
 import { createLogger } from '../logger/index.js';
+import { CapabilitiesHandler } from './handlers/CapabilitiesHandler.js';
 
 export class SocketNotifier {
   private socketService: SocketService | null = null;
@@ -202,6 +203,11 @@ export class SocketNotifier {
     });
   }
 
+  async notifyPermissionChangedByUser(userId: string): Promise<boolean> {
+    const capabilities = await CapabilitiesHandler.handleGetCapabilities(userId);
+    return this.notifyPermissionChanged(userId, capabilities);
+  }
+
   /**
    * Push permission change notification
    * @param userId User ID
@@ -275,8 +281,7 @@ export class SocketNotifier {
         try {
           const permissions = JSON.parse(user.permissions) as Permissions;
           if (!permissions || permissions[serverId]?.enabled !== false) {
-            const capabilities = await CapabilitiesService.getInstance().getUserCapabilities(user.userId);
-            this.notifyPermissionChanged(user.userId, capabilities);
+            this.notifyPermissionChangedByUser(user.userId);
           }
         } catch (error) {
           this.logger.error({ error, userId: user.userId }, 'Failed to notify user permission changed via Socket for user');

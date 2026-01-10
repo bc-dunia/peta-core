@@ -123,9 +123,7 @@ export class ConfigureServerHandler {
     await UserRepository.updateUserPreferences(userId, userPreferences);
 
     // 6. Notify all user clients
-    const capabilitiesService = CapabilitiesService.getInstance();
-    const capabilities = await capabilitiesService.getUserCapabilities(userId);
-    socketNotifier.notifyPermissionChanged(userId, capabilities);
+    socketNotifier.notifyPermissionChangedByUser(userId);
 
     // 7. Notify all active sessions
     await this.sessionStore.updateUserPreferences(userId);

@@ -353,9 +353,7 @@ export class UserHandler {
 
     // ✨ Push complete capability configuration via Socket
     try {
-      const capabilitiesService = CapabilitiesService.getInstance();
-      const capabilities = await capabilitiesService.getUserCapabilities(targetId);
-      socketNotifier.notifyPermissionChanged(targetId, capabilities);
+      socketNotifier.notifyPermissionChangedByUser(targetId);
     } catch (error) {
       this.logger.error({ error, targetId }, 'Failed to notify permission changed via Socket for user');
     }

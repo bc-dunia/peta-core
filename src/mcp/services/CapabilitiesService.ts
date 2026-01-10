@@ -161,19 +161,15 @@ export class CapabilitiesService {
     const capabilities: McpServerCapabilities = {};
 
     // Iterate through all servers
-    const allServers = await this.serverManager.getAllServers();
+    const allServers = await this.serverManager.getAllEnabledServers();
     for (const server of allServers) {
-      if (server.enabled === false) {
-        continue;
-      }
-
       const configTemplate = server.configTemplate;
       if (server.allowUserInput === true && (!configTemplate || configTemplate.trim() === '')) {
         continue;
       }
 
       const serverId = server.serverId;
-      const enabled = permissions[serverId]?.enabled ?? true;
+      const enabled = permissions[serverId]?.enabled ?? server.publicAccess;
 
       // Get server capability configuration
       const serverContext = this.serverManager.getServerContext(serverId);

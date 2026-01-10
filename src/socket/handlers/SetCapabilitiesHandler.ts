@@ -9,6 +9,7 @@ import { UserRepository } from '../../repositories/UserRepository.js';
 import { SessionStore } from '../../mcp/core/SessionStore.js';
 import { McpServerCapabilities, ServerConfigWithEnabled } from '../../mcp/types/mcp.js';
 import { createLogger } from '../../logger/index.js';
+import { CapabilitiesHandler } from './CapabilitiesHandler.js';
 
 export class SetCapabilitiesHandler {
   private capabilitiesService: CapabilitiesService;
@@ -28,7 +29,7 @@ export class SetCapabilitiesHandler {
    */
   async handleSetCapabilities(userId: string, submittedCapabilities: McpServerCapabilities): Promise<void> {
     // 1. Get current complete capabilities (for validation)
-    const currentCapabilities = await this.capabilitiesService.getUserCapabilities(userId);
+    const currentCapabilities = await CapabilitiesHandler.handleGetCapabilities(userId);
 
     // 2. Extract and validate enabled fields (only save enabled for existing items)
     const validatedPreferences = this.extractEnabledFields(submittedCapabilities, currentCapabilities);
