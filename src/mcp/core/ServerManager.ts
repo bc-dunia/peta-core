@@ -483,7 +483,7 @@ export class ServerManager {
         mcpCaps.prompts = {};
         mcpCaps.configured = false;
       }
-      capabilities[context.serverEntity.serverId] = mcpCaps;
+      capabilities[context.serverID] = mcpCaps;
     }
     return capabilities;
   }

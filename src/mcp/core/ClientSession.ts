@@ -160,9 +160,17 @@ export class ClientSession {
   async startUserTemporaryServers(): Promise<void> {
     try {
 
+      let notificationToolsChanged = false;
+      let notificationResourcesChanged = false;
+      let notificationPromptsChanged = false;
       // Iterate through all configured servers
       for (const [serverId, encryptedLaunchConfig] of Object.entries(this.launchConfigs)) {
         if (!encryptedLaunchConfig) {
+          continue;
+        }
+
+        const serverContext = ServerManager.instance.getTemporaryServer(serverId, this.userId);
+        if (serverContext && (serverContext.status === ServerStatus.Online || serverContext.status === ServerStatus.Sleeping)) {
           continue;
         }
 
@@ -195,13 +203,13 @@ export class ClientSession {
           );
 
           if (serverContext.tools?.tools?.length ?? 0 > 0) {
-            this.sendToolListChanged();
+            notificationToolsChanged = true;
           }
-          if (serverContext.resources?.resources?.length ?? 0 > 0) {
-            this.sendResourceListChanged();
+          if ((serverContext.resources?.resources?.length ?? 0) > 0 || (serverContext.resourceTemplates?.resourceTemplates?.length ?? 0) > 0) {
+            notificationResourcesChanged = true;
           }
           if (serverContext.prompts?.prompts?.length ?? 0 > 0) {
-            this.sendPromptListChanged();
+            notificationPromptsChanged = true;
           }
 
           this.logger.info({
@@ -215,6 +223,16 @@ export class ClientSession {
           this.logger.error({ error, serverId, userId: this.userId }, 'Failed to start temporary server for user');
           // Continue processing other servers, don't interrupt entire flow
         }
+      }
+
+      if (notificationToolsChanged) {
+        this.sendToolListChanged();
+      }
+      if (notificationResourcesChanged) {
+        this.sendResourceListChanged();
+      }
+      if (notificationPromptsChanged) {
+        this.sendPromptListChanged();
       }
     } catch (error: any) {
       this.logger.error({ error, userId: this.userId }, 'Failed to load user temporary servers');
@@ -251,6 +269,8 @@ export class ClientSession {
   canAccessServerCapabilities(serverID: string, type: 'tool' | 'resource' | 'prompt', name: string): ServerContext | undefined {
     const serverContext = ServerManager.instance.getServerContext(serverID, this.userId);
     if (!serverContext) return undefined;
+    if (!serverContext.serverEntity.enabled) return undefined;
+    if (serverContext.status !== ServerStatus.Online && serverContext.status !== ServerStatus.Sleeping) return undefined;
 
     try {
       const serverPerms = serverContext.capabilitiesConfig;
@@ -290,7 +310,7 @@ export class ClientSession {
     return this.canUseToolByServerContext(serverContext, toolName);
   }
 
-  canUseToolByServerContext(serverContext: ServerContext, toolName: string): boolean {
+  private canUseToolByServerContext(serverContext: ServerContext, toolName: string): boolean {
     
     if (serverContext.serverEntity.allowUserInput) {
       if (serverContext.userId !== this.userId) return false;
@@ -314,7 +334,7 @@ export class ClientSession {
     return this.canAccessResourceByServerContext(serverContext, resourceName);
   }
 
-  canAccessResourceByServerContext(serverContext: ServerContext, resourceName: string): boolean {
+  private canAccessResourceByServerContext(serverContext: ServerContext, resourceName: string): boolean {
     
     if (serverContext.serverEntity.allowUserInput) {
       if (serverContext.userId !== this.userId) return false;
@@ -338,7 +358,7 @@ export class ClientSession {
   }
 
 
-  canUsePromptByServerContext(serverContext: ServerContext, promptName: string): boolean {
+  private canUsePromptByServerContext(serverContext: ServerContext, promptName: string): boolean {
     if (serverContext.serverEntity.allowUserInput) {
       if (serverContext.userId !== this.userId) return false;
     } else {

@@ -25,22 +25,21 @@ export class QueryHandler {
    */
   async handleGetAvailableServersCapabilities(request: AdminRequest<any>): Promise<{ capabilities: McpServerCapabilities }> {
     const capabilities = this.serverManager.getAvailableServersCapabilities();
-    const servers = await ServerRepository.findAll();
+    const servers = await this.serverManager.getAllServers();
     for (const server of servers) {
-      if (server.enabled === false) {
+
+      if (!server.enabled) {
         continue;
       }
 
-      const enabled = server.enabled && server.publicAccess;
-
       if (capabilities[server.serverId]) {
-        capabilities[server.serverId].enabled = enabled;
+        capabilities[server.serverId].enabled = server.publicAccess;
         continue;
       }
 
       const serverCapabilities = JSON.parse(server.capabilities ?? '{}');
       capabilities[server.serverId] = {
-        enabled: enabled,
+        enabled: server.publicAccess,
         serverName: server.serverName,
         allowUserInput: server.allowUserInput,
         authType: server.authType,
@@ -63,6 +62,13 @@ export class QueryHandler {
     const { targetId } = request.data;
 
     const capabilities = await CapabilitiesService.getInstance().getCapabilitiesFromDatabase(targetId);
+    for (const [serverId, serverConfig] of Object.entries(capabilities)) {
+      if (serverConfig.allowUserInput) {
+        serverConfig.tools = {};
+        serverConfig.resources = {};
+        serverConfig.prompts = {};
+      }
+    }
     return {
       capabilities: capabilities
     };

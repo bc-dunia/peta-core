@@ -18,6 +18,7 @@ import {
 } from '../types/mcp.js';
 import { DangerLevel, ServerStatus } from '../../types/enums.js';
 import ServerRepository from '../../repositories/ServerRepository.js';
+import { ServerContext } from '../core/ServerContext.js';
 
 export class CapabilitiesService {
   private static instance: CapabilitiesService;
@@ -58,7 +59,6 @@ export class CapabilitiesService {
       return {};
     }
 
-    const userLaunchConfigs = JSON.parse(user.launchConfigs ?? '{}') as { [serverId: string]: string };
     const userPreferences = JSON.parse(user.userPreferences ?? '{}') as McpServerCapabilities;
 
     const capabilities = await this.getCapabilitiesFromDatabase(userId);
@@ -87,28 +87,6 @@ export class CapabilitiesService {
             if (promptConfig.enabled === false) {
               delete serverConfig.prompts[promptName];
             }
-          }
-        }
-        
-        const server = await ServerRepository.findByServerId(serverId);
-        if (server && server.allowUserInput) {
-          const serverContext = this.serverManager.getTemporaryServer(serverId, userId);
-          if (serverContext) {
-            const mcpCapabilities = serverContext.getMcpCapabilities();
-            capabilities[serverId] = {
-              ...mcpCapabilities,
-              configured: userLaunchConfigs[serverId] ? true : false
-            };
-          } else {
-            capabilities[serverId] = {
-              ...(userPreferences[serverId] ?? {}),
-              enabled: true,
-              serverName: server.serverName,
-              allowUserInput: server.allowUserInput,
-              authType: server.authType,
-              configTemplate: server.configTemplate || '',
-              configured: userLaunchConfigs[serverId] ? true : false
-            };
           }
         }
       }
@@ -158,21 +136,24 @@ export class CapabilitiesService {
 
     // Parse user permissions
     const permissions = JSON.parse(user.permissions) as Permissions;
+    const launchConfigs = JSON.parse(user.launchConfigs ?? '{}') as { [serverId: string]: string };
     const capabilities: McpServerCapabilities = {};
 
     // Iterate through all servers
     const allServers = await this.serverManager.getAllEnabledServers();
     for (const server of allServers) {
       const configTemplate = server.configTemplate;
-      if (server.allowUserInput === true && (!configTemplate || configTemplate.trim() === '')) {
-        continue;
-      }
 
       const serverId = server.serverId;
       const enabled = permissions[serverId]?.enabled ?? server.publicAccess;
 
       // Get server capability configuration
-      const serverContext = this.serverManager.getServerContext(serverId);
+      let serverContext: ServerContext | undefined;
+      if (server.allowUserInput) {
+        serverContext = this.serverManager.getTemporaryServer(serverId, userId);
+      } else {
+        serverContext = this.serverManager.getServerContext(serverId);
+      }
       let mcpCapabilities: ServerConfigWithEnabled;
       let status: ServerStatus;
       if (serverContext) {
@@ -240,7 +221,7 @@ export class CapabilitiesService {
 
       // Construct complete server capability configuration
       // Determine if it's a user-configured Server
-      const userConfigured = server.allowUserInput && user.launchConfigs && JSON.parse(user.launchConfigs)[serverId];
+      const userConfigured = server.allowUserInput && launchConfigs[serverId] !== undefined;
 
       capabilities[serverId] = {
         ...mcpCapabilities,
@@ -249,7 +230,7 @@ export class CapabilitiesService {
         allowUserInput: server.allowUserInput,
         authType: server.authType,
         configTemplate: configTemplate,
-        configured: server.allowUserInput ? Boolean(userConfigured) : false,
+        configured: server.allowUserInput ? userConfigured : false,
         status: status
       } as ServerConfigWithEnabled;
     }
