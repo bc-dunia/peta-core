@@ -337,17 +337,17 @@ export class ServerHandler {
       } else if (updateData.lazyStartEnabled !== undefined) {
         serverContext = await this.updateLazyStartEnabled(existingServer, server, updateData.lazyStartEnabled);
       }
-      if (!serverContext && willHandlePublicAccessChange) {
+      if (willHandlePublicAccessChange) {
         if (existingServer.allowUserInput) {
           const temporaryServers = this.serverManager.getTemporaryServers(serverId);
           for (const temporaryServer of temporaryServers) {
-            temporaryServer.serverEntity.publicAccess = publicAccess;
+            temporaryServer.serverEntity = server;
             serverContext = temporaryServer;
           }
         } else {
           serverContext = this.serverManager.getServerContext(serverId);
           if (serverContext) {
-            serverContext.serverEntity.publicAccess = publicAccess;
+            serverContext.serverEntity = server;
           }
         }
       }

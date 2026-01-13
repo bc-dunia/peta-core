@@ -319,7 +319,8 @@ export class ConfigController {
       res.json(successResponse);
 
     } catch (error) {
-      this.logger.error({ error }, 'Admin request error');
+      const action = req.body.action;
+      this.logger.error({ action, error }, 'Admin request error');
       let code = AdminErrorCode.INVALID_REQUEST;
       if (error instanceof AdminError) {
         code = error.code;
