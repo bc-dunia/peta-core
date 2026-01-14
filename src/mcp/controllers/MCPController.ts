@@ -10,14 +10,11 @@ import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { createLogger } from '../../logger/index.js';
 
 export class MCPController {
-  private sessionStore: SessionStore;
   
   // Logger for MCPController
   private logger = createLogger('MCPController');
 
-  constructor(sessionStore: SessionStore) {
-    this.sessionStore = sessionStore;
-  }
+  constructor() {}
 
   /**
    * POST /mcp - Handle MCP request
@@ -28,7 +25,7 @@ export class MCPController {
       const sessionId = req.headers['Mcp-Session-Id'] as string || req.headers['mcp-session-id'] as string || clientSession.sessionId;
 
       // Get ProxySession directly from SessionStore
-      let proxySession = this.sessionStore.getProxySession(sessionId);
+      let proxySession = SessionStore.instance.getProxySession(sessionId);
 
       if (!proxySession) {
         throw new AuthError(
@@ -68,7 +65,7 @@ export class MCPController {
       const clientSession = req.clientSession;
       const sessionId = req.headers['mcp-session-id'] as string || req.headers['Mcp-Session-Id'] as string || clientSession?.sessionId ;
 
-      const proxySession = this.sessionStore.getProxySession(sessionId ?? 'xx');
+      const proxySession = SessionStore.instance.getProxySession(sessionId ?? 'xx');
 
       if (!sessionId || !proxySession) {
         const errorMessage = 'Invalid or missing session ID';
@@ -120,7 +117,7 @@ export class MCPController {
 
     try {
       // Get ProxySession
-      const proxySession = this.sessionStore.getProxySession(sessionId);
+      const proxySession = SessionStore.instance.getProxySession(sessionId);
 
       if (!proxySession) {
         // If session doesn't exist, return 200 (according to MCP protocol)

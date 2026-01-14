@@ -34,18 +34,21 @@ import {
 } from './types/socket.types.js';
 import UserRepository from '../repositories/UserRepository.js';
 import { Permissions } from '../mcp/types/mcp.js';
-import { CapabilitiesService } from '../mcp/services/CapabilitiesService.js';
-import { SessionStore } from '../mcp/core/SessionStore.js';
-import { ClientSession } from '../mcp/core/ClientSession.js';
 import { createLogger } from '../logger/index.js';
-import { CapabilitiesHandler } from './handlers/CapabilitiesHandler.js';
+import { UserRequestHandler } from '../user/UserRequestHandler.js';
 
 export class SocketNotifier {
   private socketService: SocketService | null = null;
-  private sessionStore: SessionStore | null = null;
 
   // Logger for SocketNotifier
   private logger = createLogger('SocketNotifier');
+
+  static instance: SocketNotifier = new SocketNotifier();
+  static getInstance(): SocketNotifier {
+    return SocketNotifier.instance;
+  }
+
+  private constructor() {}
 
   /**
    * Set SocketService instance
@@ -53,14 +56,6 @@ export class SocketNotifier {
    */
   setSocketService(socketService: SocketService): void {
     this.socketService = socketService;
-  }
-
-  /**
-   * Set SessionStore instance
-   * @param sessionStore SessionStore instance
-   */
-  setSessionStore(sessionStore: SessionStore): void {
-    this.sessionStore = sessionStore;
   }
 
   /**
@@ -204,7 +199,8 @@ export class SocketNotifier {
   }
 
   async notifyPermissionChangedByUser(userId: string): Promise<boolean> {
-    const capabilities = await CapabilitiesHandler.handleGetCapabilities(userId);
+    // Get capabilities from UserRequestHandler (transport-agnostic business logic)
+    const capabilities = await UserRequestHandler.instance.handleGetCapabilities(userId);
     return this.notifyPermissionChanged(userId, capabilities);
   }
 
@@ -228,31 +224,14 @@ export class SocketNotifier {
    * @param userId User ID
    * @returns Whether notification was successfully pushed
    */
-  notifyOnlineSessions(userId: string): boolean {
+  async notifyOnlineSessions(userId: string): Promise<boolean> {
     this.logger.debug({ userId }, 'Notifying user online sessions');
 
     try {
-      // Check if sessionStore is initialized
-      if (!this.sessionStore) {
-        this.logger.warn({ userId }, 'SessionStore not initialized, cannot notify online sessions');
-        return false;
-      }
+      // Get session data from UserRequestHandler (transport-agnostic business logic)
+      const sessionData = await UserRequestHandler.instance.handleGetOnlineSessions(userId);
 
-      // 1. Get all MCP ClientSessions for the user
-      const sessions = this.sessionStore.getUserSessions(userId);
-
-      // 2. Build session data
-      const sessionData = sessions.map((session: ClientSession) => ({
-        sessionId: session.sessionId,
-        clientName: session.clientInfo?.name || 'Unknown Client',
-        userAgent: session.authContext.userAgent || 'Unknown',
-        lastActive: session.lastActive
-      }));
-
-      // 3. Build notification message
-      const count = sessionData.length;
-
-      // 4. Send notification
+      // Send notification
       const success = this.sendNotification(userId, {
         type: 'online_sessions',
         message: `You have ${sessionData.length} active session(s)`,
@@ -261,7 +240,7 @@ export class SocketNotifier {
         severity: 'info'
       });
 
-      this.logger.debug({ userId, count, success }, 'Online sessions notification sent');
+      this.logger.debug({ userId, count: sessionData.length, success }, 'Online sessions notification sent');
       return success;
 
     } catch (error: any) {
@@ -483,4 +462,4 @@ export class SocketNotifier {
 }
 
 // Export singleton instance
-export const socketNotifier = new SocketNotifier();
+export const socketNotifier = SocketNotifier.instance;

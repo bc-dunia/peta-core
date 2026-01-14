@@ -59,8 +59,6 @@ export class ServerManager {
   private temporaryServers: Map<string, ServerContext> = new Map();
   private temporaryServerLoggers: Map<string, ServerLogger> = new Map();
   private globalRouter?: GlobalRequestRouter;
-  private logService?: LogService;
-  private sessionStore?: SessionStore;
   private clientOptions: ClientOptions = {
     capabilities: {
       // Declare client capabilities so server knows it can initiate reverse requests
@@ -87,7 +85,7 @@ export class ServerManager {
   // Logger for ServerManager
   private logger = createLogger('ServerManager');
 
-  static instance: ServerManager = new ServerManager();
+  static readonly instance: ServerManager = new ServerManager();
 
   constructor() {
 
@@ -112,19 +110,9 @@ export class ServerManager {
         context.status = ServerStatus.Sleeping;
       }
       this.logger.info({ count: servers.length }, 'All enabled servers initialized in sleeping state (lazy start enabled)');
+
+      this.startIdleCheck();
     });
-  }
-
-  /**
-   * Set dependency services
-   */
-  setDependencies(logService: LogService, sessionStore: SessionStore): void {
-    this.logService = logService;
-    this.sessionStore = sessionStore;
-    this.globalRouter = GlobalRequestRouter.getInstance(logService, sessionStore);
-
-    // Start idle check timer
-    this.startIdleCheck();
   }
 
   /**
@@ -231,7 +219,7 @@ export class ServerManager {
       if (!userId) {
         throw new McpError(ErrorCode.InvalidParams, 'User ID is required for temporary servers');
       }
-      const session = this.sessionStore?.getUserFirstSession(userId);
+      const session = SessionStore.instance?.getUserFirstSession(userId);
       if (!session) {
         throw new McpError(ErrorCode.InvalidParams, `User ${userId} has no active session`);
       }
@@ -747,7 +735,7 @@ export class ServerManager {
           return;
         }
 
-        const affectedSessions = this.sessionStore?.getSessionsUsingServer(serverEntity.serverId) ?? [];
+        const affectedSessions = SessionStore.instance?.getSessionsUsingServer(serverEntity.serverId) ?? [];
         
         serverContext.status = ServerStatus.Error;
         serverContext.recordError(`Transport closed by server`);
@@ -1345,10 +1333,10 @@ export class ServerManager {
       // 8. Save to database
       await UserRepository.updateLaunchConfigs(userId, launchConfigs);
 
-      // 9. Synchronously update all sessions for this user (refer to ConfigureServerHandler.ts:94-98)
+      // 9. Synchronously update all sessions for this user (refer to src/user/UserRequestHandler.ts :262-266)
       const launchConfigsStr = JSON.stringify(launchConfigs);
-      if (this.sessionStore) {
-        const userSessions = this.sessionStore.getUserSessions(userId);
+      if (SessionStore.instance) {
+        const userSessions = SessionStore.instance.getUserSessions(userId);
         for (const session of userSessions) {
           session.launchConfigs = launchConfigsStr;
         }
@@ -1588,7 +1576,7 @@ export class ServerManager {
         }
 
         // Get ProxySession through SessionStore
-        const proxySession = this.sessionStore!.getProxySession(sessionId);
+        const proxySession = SessionStore.instance!.getProxySession(sessionId);
         if (proxySession) {
           try {
             // Forward cancellation notification to client
@@ -1618,7 +1606,7 @@ export class ServerManager {
         }
 
         // Get ProxySession through SessionStore
-        const proxySession = this.sessionStore!.getProxySession(sessionId);
+        const proxySession = SessionStore.instance!.getProxySession(sessionId);
         if (proxySession) {
           try {
             // Forward progress notification to client

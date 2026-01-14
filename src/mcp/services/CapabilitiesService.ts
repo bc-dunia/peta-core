@@ -10,36 +10,25 @@
 import { SessionStore } from '../core/SessionStore.js';
 import { ServerManager } from '../core/ServerManager.js';
 import { UserRepository } from '../../repositories/UserRepository.js';
-import { ClientSession } from '../core/ClientSession.js';
 import {
   McpServerCapabilities,
   Permissions,
   ServerConfigWithEnabled
 } from '../types/mcp.js';
 import { DangerLevel, ServerStatus } from '../../types/enums.js';
-import ServerRepository from '../../repositories/ServerRepository.js';
 import { ServerContext } from '../core/ServerContext.js';
 
 export class CapabilitiesService {
   private static instance: CapabilitiesService;
 
-  private constructor(
-    private sessionStore: SessionStore,
-    private serverManager: ServerManager
-  ) {}
+  private constructor() {}
 
   /**
    * Get singleton instance
    */
-  static getInstance(
-    sessionStore?: SessionStore,
-    serverManager?: ServerManager
-  ): CapabilitiesService {
+  static getInstance(): CapabilitiesService {
     if (!CapabilitiesService.instance) {
-      if (!sessionStore || !serverManager) {
-        throw new Error('CapabilitiesService not initialized. Call getInstance() with parameters first.');
-      }
-      CapabilitiesService.instance = new CapabilitiesService(sessionStore, serverManager);
+      CapabilitiesService.instance = new CapabilitiesService();
     }
     return CapabilitiesService.instance;
   }
@@ -140,7 +129,7 @@ export class CapabilitiesService {
     const capabilities: McpServerCapabilities = {};
 
     // Iterate through all servers
-    const allServers = await this.serverManager.getAllEnabledServers();
+    const allServers = await ServerManager.instance.getAllEnabledServers();
     for (const server of allServers) {
       const configTemplate = server.configTemplate;
 
@@ -150,9 +139,9 @@ export class CapabilitiesService {
       // Get server capability configuration
       let serverContext: ServerContext | undefined;
       if (server.allowUserInput) {
-        serverContext = this.serverManager.getTemporaryServer(serverId, userId);
+        serverContext = ServerManager.instance.getTemporaryServer(serverId, userId);
       } else {
-        serverContext = this.serverManager.getServerContext(serverId);
+        serverContext = ServerManager.instance.getServerContext(serverId);
       }
       let mcpCapabilities: ServerConfigWithEnabled;
       let status: ServerStatus;

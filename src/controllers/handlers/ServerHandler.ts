@@ -24,10 +24,7 @@ export class ServerHandler {
   // Logger for ServerHandler
   private logger = createLogger('ServerHandler');
 
-  constructor(
-    private sessionStore: SessionStore,
-    private serverManager: ServerManager
-  ) {}
+  constructor() {}
 
   /**
    * Start server (2001)
@@ -55,7 +52,7 @@ export class ServerHandler {
       );
     }
 
-    const serverContext = await this.serverManager.addServer(serverEntity, token);
+    const serverContext = await ServerManager.instance.addServer(serverEntity, token);
 
     const changed = {
       toolsChanged: (serverContext.tools?.tools?.length ?? 0) > 0,
@@ -64,7 +61,7 @@ export class ServerHandler {
     };
 
     // Notify related users of server capability changes
-    this.notifyUsersOfServerChange(targetId, this.sessionStore.getSessionsUsingServer(targetId), 'server_started', changed);
+    this.notifyUsersOfServerChange(targetId, SessionStore.instance.getSessionsUsingServer(targetId), 'server_started', changed);
 
     // Log audit event
     AuthUtils.logAuthEvent('server_started', undefined, targetId, true, JSON.stringify(changed));
@@ -128,11 +125,11 @@ export class ServerHandler {
    * Connect all servers (2005)
    */
   async handleConnectAllServers(request: AdminRequest<any>, token: string): Promise<{ successServers: { serverId: string; serverName: string; proxyId: number }[]; failedServers: { serverId: string; serverName: string; proxyId: number }[] }> {
-    const { successServers, failedServers } = await this.serverManager.connectAllServers(token);
+    const { successServers, failedServers } = await ServerManager.instance.connectAllServers(token);
 
     for (const server of successServers) {
-      const serveContext = this.serverManager.getServerContext(server.serverId);
-      this.notifyUsersOfServerChange(server.serverId, this.sessionStore.getSessionsUsingServer(server.serverId), 'server_started', {
+      const serveContext = ServerManager.instance.getServerContext(server.serverId);
+      this.notifyUsersOfServerChange(server.serverId, SessionStore.instance.getSessionsUsingServer(server.serverId), 'server_started', {
         toolsChanged: (serveContext?.tools?.tools?.length ?? 0) > 0,
         resourcesChanged: (serveContext?.resources?.resources?.length ?? 0) > 0,
         promptsChanged: (serveContext?.prompts?.prompts?.length ?? 0) > 0
@@ -324,7 +321,7 @@ export class ServerHandler {
     let server = await ServerRepository.update(serverId, updateData);
 
     let serverContext: ServerContext | undefined;
-    const affectedSessions = this.sessionStore.getSessionsUsingServer(serverId);
+    const affectedSessions = SessionStore.instance.getSessionsUsingServer(serverId);
     if (existingServer.enabled === true && updateData.enabled === true) {
       // Server remains enabled
       if (updateData.capabilities !== undefined && updateData.launchConfig !== undefined) {
@@ -339,13 +336,13 @@ export class ServerHandler {
       }
       if (willHandlePublicAccessChange) {
         if (existingServer.allowUserInput) {
-          const temporaryServers = this.serverManager.getTemporaryServers(serverId);
+          const temporaryServers = ServerManager.instance.getTemporaryServers(serverId);
           for (const temporaryServer of temporaryServers) {
             temporaryServer.serverEntity = server;
             serverContext = temporaryServer;
           }
         } else {
-          serverContext = this.serverManager.getServerContext(serverId);
+          serverContext = ServerManager.instance.getServerContext(serverId);
           if (serverContext) {
             serverContext.serverEntity = server;
           }
@@ -354,18 +351,18 @@ export class ServerHandler {
     } else if (existingServer.enabled === true && updateData.enabled === false) {
       // Server changed from enabled to disabled
       if (existingServer.allowUserInput) {
-        const temporaryServers = this.serverManager.getTemporaryServers(serverId);
+        const temporaryServers = ServerManager.instance.getTemporaryServers(serverId);
         if (temporaryServers.length > 0) {
           serverContext = temporaryServers[0];
         }
-        await this.serverManager.closeAllTemporaryServersByTemplate(serverId);
+        await ServerManager.instance.closeAllTemporaryServersByTemplate(serverId);
       } else {
-        serverContext = await this.serverManager.removeServer(serverId);
+        serverContext = await ServerManager.instance.removeServer(serverId);
       }
 
     } else if (existingServer.enabled === false && updateData.enabled === true) {
       // Server changed from disabled to enabled
-      serverContext = await this.serverManager.addServer(serverId, token);
+      serverContext = await ServerManager.instance.addServer(serverId, token);
     }
 
     if (serverContext) {
@@ -409,7 +406,7 @@ export class ServerHandler {
     }
     if (server.allowUserInput) {
       // 1. Close all temporary servers based on this template
-      await this.serverManager.closeAllTemporaryServersByTemplate(serverId);
+      await ServerManager.instance.closeAllTemporaryServersByTemplate(serverId);
 
       // 2. Clean up all users' launchConfigs and userPreferences
       await UserRepository.removeServerFromAllUsers(serverId);
@@ -417,7 +414,7 @@ export class ServerHandler {
       this.logger.info({ serverId }, 'Cleaned up all user configurations for template server');
     }
 
-    const affectedSessions = this.sessionStore.getSessionsUsingServer(serverId);
+    const affectedSessions = SessionStore.instance.getSessionsUsingServer(serverId);
     await ServerRepository.delete(serverId);
     
 
@@ -436,7 +433,7 @@ export class ServerHandler {
         promptsChanged: true
       };
     } else {
-      const serverContext = await this.serverManager.removeServer(serverId);
+      const serverContext = await ServerManager.instance.removeServer(serverId);
       changed = {
         toolsChanged: (serverContext?.tools?.tools?.length ?? 0) > 0,
         resourcesChanged: (serverContext?.resources?.resources?.length ?? 0) > 0,
@@ -461,8 +458,8 @@ export class ServerHandler {
 
     const servers = await ServerRepository.findByProxyId(proxyId);
     for (const server of servers) {
-      const affectedSessions = this.sessionStore.getSessionsUsingServer(server.serverId);
-      const serverContext = await this.serverManager.removeServer(server.serverId);
+      const affectedSessions = SessionStore.instance.getSessionsUsingServer(server.serverId);
+      const serverContext = await ServerManager.instance.removeServer(server.serverId);
       if (serverContext) {
         const changed = {
           toolsChanged: (serverContext?.tools?.tools?.length ?? 0) > 0,
@@ -471,7 +468,7 @@ export class ServerHandler {
         };
         this.notifyUsersOfServerChange(server.serverId, affectedSessions, 'server_deleted', changed);
       } else if (server.allowUserInput) {
-        await this.serverManager.closeAllTemporaryServersByTemplate(server.serverId);
+        await ServerManager.instance.closeAllTemporaryServersByTemplate(server.serverId);
         const changed = {
           toolsChanged: true,
           resourcesChanged: true,
@@ -545,17 +542,17 @@ export class ServerHandler {
     if (!server) {
       throw new AdminError(`Server ${targetId} not found`, AdminErrorCode.SERVER_NOT_FOUND);
     }
-    const affectedSessions = this.sessionStore.getSessionsUsingServer(targetId);
+    const affectedSessions = SessionStore.instance.getSessionsUsingServer(targetId);
     let changed;
     if (server.allowUserInput) {
-      await this.serverManager.closeAllTemporaryServersByTemplate(targetId);
+      await ServerManager.instance.closeAllTemporaryServersByTemplate(targetId);
       changed = {
         toolsChanged: true,
         resourcesChanged: true,
         promptsChanged: true
       };
     } else {
-      const serverContext = await this.serverManager.removeServer(targetId);
+      const serverContext = await ServerManager.instance.removeServer(targetId);
       changed = {
         toolsChanged: (serverContext?.tools?.tools?.length ?? 0) > 0,
         resourcesChanged: (serverContext?.resources?.resources?.length ?? 0) > 0,
@@ -614,8 +611,8 @@ export class ServerHandler {
   private async updateServerCapabilities(targetId: string, capabilities: string): Promise<void> {
 
     await ServerRepository.updateCapabilities(targetId, capabilities);
-    const changed = await this.serverManager.updateServerCapabilitiesConfig(targetId, capabilities);
-    this.notifyUsersOfServerChange(targetId, this.sessionStore.getSessionsUsingServer(targetId), 'capabilities_updated', changed);
+    const changed = await ServerManager.instance.updateServerCapabilitiesConfig(targetId, capabilities);
+    this.notifyUsersOfServerChange(targetId, SessionStore.instance.getSessionsUsingServer(targetId), 'capabilities_updated', changed);
   }
 
   private async updateServerLaunchConfig(targetId: string, launchConfig: string, token: string): Promise<void> {
@@ -629,7 +626,7 @@ export class ServerHandler {
       throw new AdminError(`Server ${targetId} is a template server and cannot be updated`, AdminErrorCode.INVALID_REQUEST);
     }
 
-    let serverContext = this.serverManager.getServerContext(targetId);
+    let serverContext = ServerManager.instance.getServerContext(targetId);
 
     const oldLaunchConfig = entity.launchConfig;
     if (launchConfig === oldLaunchConfig) {
@@ -647,8 +644,8 @@ export class ServerHandler {
     if (!serverContext) {
       return;
     }
-    await this.serverManager.reconnectServer(newServer, token);
-    await this.notifyUsersOfServerChangeByServerContext(serverContext, this.sessionStore.getSessionsUsingServer(targetId), 'launch_cmd_updated');
+    await ServerManager.instance.reconnectServer(newServer, token);
+    await this.notifyUsersOfServerChangeByServerContext(serverContext, SessionStore.instance.getSessionsUsingServer(targetId), 'launch_cmd_updated');
   }
 
   private async updateLazyStartEnabled(existingServer: Server, newServer: Server, lazyStartEnabled?: boolean | undefined): Promise<ServerContext | undefined> {
@@ -664,28 +661,28 @@ export class ServerHandler {
     let serverContext: ServerContext | undefined;
 
     if (existingServer.allowUserInput) {
-      const temporaryServers = this.serverManager.getTemporaryServers(serverId);
+      const temporaryServers = ServerManager.instance.getTemporaryServers(serverId);
 
       for (const temporaryServer of temporaryServers) {
         temporaryServer.serverEntity = newServer;
         if (lazyStartEnabled === false && existingServer.lazyStartEnabled === true) {
-          if (temporaryServer.status === ServerStatus.Sleeping && this.serverManager.getOwnerToken()) {
-            this.serverManager.reconnectTemporaryServer(temporaryServer.serverEntity, temporaryServer.userId!, temporaryServer.userToken!);
+          if (temporaryServer.status === ServerStatus.Sleeping && ServerManager.instance.getOwnerToken()) {
+            ServerManager.instance.reconnectTemporaryServer(temporaryServer.serverEntity, temporaryServer.userId!, temporaryServer.userToken!);
           }
         }
       }
     } else {
-      const context = this.serverManager.getServerContext(serverId);
+      const context = ServerManager.instance.getServerContext(serverId);
       if (context) {
         context.serverEntity = newServer;
         if (lazyStartEnabled === false && existingServer.lazyStartEnabled === true) {
-          if (context.status === ServerStatus.Sleeping && this.serverManager.getOwnerToken()) {
-            this.serverManager.reconnectServer(context.serverEntity, this.serverManager.getOwnerToken());
+          if (context.status === ServerStatus.Sleeping && ServerManager.instance.getOwnerToken()) {
+            ServerManager.instance.reconnectServer(context.serverEntity, ServerManager.instance.getOwnerToken());
           }
         }
       } else {
         if (lazyStartEnabled === true && existingServer.lazyStartEnabled === false) {
-          serverContext = this.serverManager.addSleepingServer(existingServer);
+          serverContext = ServerManager.instance.addSleepingServer(existingServer);
         }
       }
     }

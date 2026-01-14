@@ -23,6 +23,9 @@ import { OAuthRouter } from './oauth/OAuthRouter.js';
 import { MCPRouter } from './mcp/MCPRouter.js';
 import { SocketService } from './socket/SocketService.js';
 import { socketNotifier } from './socket/SocketNotifier.js';
+import { UserAuthMiddleware } from './user/UserAuthMiddleware.js';
+import { UserController } from './user/UserController.js';
+import { UserRequestHandler } from './user/UserRequestHandler.js';
 
 import cors from 'cors';
 import { LATEST_PROTOCOL_VERSION }  from "@modelcontextprotocol/sdk/types.js";
@@ -72,24 +75,23 @@ export async function initializeAuthModule() {
   const tokenValidator = new TokenValidator();
   
   // 3. Create session store
-  const sessionStore = new SessionStore(logService);
+  const sessionStore = SessionStore.instance;
   
   // 5. Create rate limit service
-  const rateLimitService = new RateLimitService(logService);
+  const rateLimitService = new RateLimitService();
   
   // 6. Create rate limit middleware
   const rateLimitMiddleware = new RateLimitMiddleware(rateLimitService);
   
   // 7. Create IP whitelist service
-  const ipWhitelistService = new IpWhitelistService(logService);
+  const ipWhitelistService = new IpWhitelistService();
   
   // 8. Create IP whitelist middleware
-  const ipWhitelistMiddleware = new IpWhitelistMiddleware(ipWhitelistService, logService);
+  const ipWhitelistMiddleware = new IpWhitelistMiddleware(ipWhitelistService);
   
   // 9. Create authentication middleware
   const authMiddleware = new AuthMiddleware(
-    tokenValidator,
-    sessionStore
+    tokenValidator
   );
   
   // 9.1. Create admin authentication middleware
@@ -98,17 +100,23 @@ export async function initializeAuthModule() {
   // 6. Create global server manager
   const serverManager = ServerManager.instance;
   
-  // 6.1. Set ServerManager dependencies
-  serverManager.setDependencies(logService, sessionStore);
-
-  CapabilitiesService.getInstance(sessionStore, serverManager);
+  CapabilitiesService.getInstance();
   
   // 10. Create configuration management interface
   const configController = new ConfigController(
-    sessionStore,
-    serverManager,
     ipWhitelistService
   );
+
+  // 10.1. Initialize User module (transport-agnostic business logic layer)
+  const userRequestHandler = UserRequestHandler.instance;
+
+  // 10.2. Create user authentication middleware
+  const userAuthMiddleware = new UserAuthMiddleware(tokenValidator);
+
+  // 10.3. Create user controller
+  const userController = UserController.instance;
+
+  appLogger.info('User module initialized successfully');
 
   // 9. Initialize event cleanup service
   const eventCleanupService = new EventCleanupService();
@@ -138,6 +146,9 @@ export async function initializeAuthModule() {
     sessionStore,
     serverManager,
     configController,
+    userRequestHandler,
+    userAuthMiddleware,
+    userController,
     logService,
     logSyncService,
     eventCleanupService,
@@ -355,7 +366,7 @@ export async function startApplication() {
     // ==================== MCP route registration ====================
 
     // Create and register MCP routes
-    const mcpRouter = new MCPRouter(authModule.sessionStore);
+    const mcpRouter = new MCPRouter();
     mcpRouter.registerRoutes(app, {
       ipWhitelistMiddleware: authModule.ipWhitelistMiddleware,
       authMiddleware: authModule.authMiddleware,
@@ -370,6 +381,15 @@ export async function startApplication() {
 
     // Register configuration management routes
     authModule.configController.registerRoutes(app);
+
+    // ==================== User route registration ====================
+
+    // Register user routes (requires valid user token, no role check)
+    // Apply user authentication middleware to /user routes
+    app.use('/user', authModule.userAuthMiddleware.authenticate);
+
+    // Register user routes
+    authModule.userController.registerRoutes(app);
 
     // Root path handler - returns basic service information
     app.get('/', (req, res) => {
@@ -492,12 +512,10 @@ export async function startApplication() {
 
     // Create and initialize SocketService
     const socketService = new SocketService();
-    socketService.setSessionStore(authModule.sessionStore); // Set SessionStore
     socketService.initialize(server);
 
     // Set SocketNotifier
     socketNotifier.setSocketService(socketService);
-    socketNotifier.setSessionStore(authModule.sessionStore);  // Set SessionStore
 
     // Update socketService reference in authModule
     authModule.socketService = socketService;

@@ -32,7 +32,6 @@ export class AuthMiddleware {
 
   constructor(
     private tokenValidator: TokenValidator,
-    private sessionStore: SessionStore,
   ) {
     this.oauthTokenValidator = new OAuthTokenValidator();
   }
@@ -45,7 +44,7 @@ export class AuthMiddleware {
       // 1. Check if there's already a valid session
       const sessionId = req.headers['Mcp-Session-Id'] as string || req.headers['mcp-session-id'] as string;
       if (sessionId && sessionId.length > 0) {
-        const existingSession = this.sessionStore.getSession(sessionId);
+        const existingSession = SessionStore.instance.getSession(sessionId);
         if (existingSession) {
           
           // New: Check if user info needs to be refreshed (every 5 minutes)
@@ -58,7 +57,7 @@ export class AuthMiddleware {
             
             if (!user || (user.expiresAt && user.expiresAt > 0 && Math.floor(Date.now() / 1000) > user.expiresAt)) {
               // Confirmed expired, clean up all user sessions
-              await this.sessionStore.removeAllUserSessions(
+              await SessionStore.instance.removeAllUserSessions(
                 existingSession.userId,
                 DisconnectReason.USER_EXPIRED
               );
@@ -79,7 +78,7 @@ export class AuthMiddleware {
           // Session valid, set request context
           req.authContext = existingSession.authContext;
           req.clientSession = existingSession;
-          this.sessionStore.getSessionLogger(existingSession.sessionId)?.updateContext(req.clientIp ?? '0.0.0.0', req.headers['user-agent'] as string || 'unknown');
+          SessionStore.instance.getSessionLogger(existingSession.sessionId)?.updateContext(req.clientIp ?? '0.0.0.0', req.headers['user-agent'] as string || 'unknown');
           
           // Update session active time
           existingSession.touch();
@@ -194,7 +193,7 @@ export class AuthMiddleware {
       req.authContext = authContext;
 
       // 4. Create new client session
-      const clientSession = await this.sessionStore.createSession(
+      const clientSession = await SessionStore.instance.createSession(
         AuthUtils.generateSessionId(),
         authContext.userId,
         token,
@@ -205,7 +204,7 @@ export class AuthMiddleware {
       req.clientSession = clientSession;
 
       // Log AuthTokenValidation (3001) - Only on FIRST validation (new session creation)
-      const sessionLogger = this.sessionStore.getSessionLogger(clientSession.sessionId);
+      const sessionLogger = SessionStore.instance.getSessionLogger(clientSession.sessionId);
       if (sessionLogger) {
         await sessionLogger.logAuth({
           action: MCPEventLogType.AuthTokenValidation,

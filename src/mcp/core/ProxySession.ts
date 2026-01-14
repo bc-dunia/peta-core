@@ -116,7 +116,6 @@ export class ProxySession {
     private sessionId: string,
     private userId: string,
     private clientSession: ClientSession,
-    private serverManager: ServerManager,
     private sessionLogger: SessionLogger,
     eventStore: PersistentEventStore,
     private onclose: (sessionId: string) => void
@@ -401,9 +400,9 @@ export class ProxySession {
     }
 
     // Ensure server is available (lazy start)
-    await this.serverManager.ensureServerAvailable(result.serverID, this.clientSession.userId);
+    await ServerManager.instance.ensureServerAvailable(result.serverID, this.clientSession.userId);
 
-    const targetServerContext = this.serverManager.getServerContext(result.serverID, this.clientSession.userId);
+    const targetServerContext = ServerManager.instance.getServerContext(result.serverID, this.clientSession.userId);
 
     // Get downstream connection
     const client = targetServerContext?.connection;
@@ -668,10 +667,10 @@ export class ProxySession {
     }
 
     // Ensure server is available (lazy start)
-    await this.serverManager.ensureServerAvailable(result.serverID, this.clientSession.userId);
+    await ServerManager.instance.ensureServerAvailable(result.serverID, this.clientSession.userId);
 
     // Routing decision
-    const targetServer = this.serverManager.getServerContext(result.serverID, this.clientSession.userId);
+    const targetServer = ServerManager.instance.getServerContext(result.serverID, this.clientSession.userId);
 
     if (!targetServer) {
       const errorTime = Date.now();
@@ -845,7 +844,7 @@ export class ProxySession {
 
     try {
       // Call ServerManager to aggregate subscription
-      await this.serverManager.subscribeResource(
+      await ServerManager.instance.subscribeResource(
         result.serverID,
         result.originalName,
         this.sessionId,
@@ -921,7 +920,7 @@ export class ProxySession {
 
     try {
       // Call ServerManager to aggregate unsubscription
-      await this.serverManager.unsubscribeResource(
+      await ServerManager.instance.unsubscribeResource(
         result.serverID,
         result.originalName,
         this.sessionId,
@@ -1035,10 +1034,10 @@ export class ProxySession {
     }
 
     // Ensure server is available (lazy start)
-    await this.serverManager.ensureServerAvailable(parseResult.serverID, this.clientSession.userId);
+    await ServerManager.instance.ensureServerAvailable(parseResult.serverID, this.clientSession.userId);
 
     // Routing decision
-    const targetServerContext = this.serverManager.getServerContext(parseResult.serverID, this.clientSession.userId);
+    const targetServerContext = ServerManager.instance.getServerContext(parseResult.serverID, this.clientSession.userId);
 
     if (!targetServerContext) {
       this.sessionLogger.logClientRequest({
@@ -1203,10 +1202,10 @@ export class ProxySession {
     }
 
     // Ensure server is available (lazy start)
-    await this.serverManager.ensureServerAvailable(result.serverID, this.clientSession.userId);
+    await ServerManager.instance.ensureServerAvailable(result.serverID, this.clientSession.userId);
 
     // Routing decision
-    const targetServerContext = this.serverManager.getServerContext(result.serverID, this.clientSession.userId);
+    const targetServerContext = ServerManager.instance.getServerContext(result.serverID, this.clientSession.userId);
 
     if (!targetServerContext) {
       const errorTime = Date.now();
@@ -1439,7 +1438,7 @@ export class ProxySession {
 
     // Clean up all resource subscriptions for this session
     try {
-      await this.serverManager.cleanupSessionSubscriptions(this.sessionId, this.userId);
+      await ServerManager.instance.cleanupSessionSubscriptions(this.sessionId, this.userId);
     } catch (error) {
       this.logger.error({ error }, 'Error cleaning up subscriptions');
     }
@@ -1681,7 +1680,7 @@ export class ProxySession {
     }
 
     // Get target server connection
-    const serverContext = this.serverManager.getServerContext(mappingEntry.serverId, this.clientSession.userId);
+    const serverContext = ServerManager.instance.getServerContext(mappingEntry.serverId, this.clientSession.userId);
     const client = serverContext?.connection;
     
     if (client) {

@@ -39,17 +39,15 @@ export class ConfigController {
   private logger = createLogger('ConfigController');
 
   constructor(
-    private sessionStore: SessionStore,
-    private serverManager: ServerManager,
     private ipWhitelistService?: IpWhitelistService,
   ) {
     // Initialize all Handlers
-    this.userHandler = new UserHandler(sessionStore, serverManager);
-    this.serverHandler = new ServerHandler(sessionStore, serverManager);
-    this.queryHandler = new QueryHandler(sessionStore, serverManager);
+    this.userHandler = new UserHandler();
+    this.serverHandler = new ServerHandler();
+    this.queryHandler = new QueryHandler();
     this.ipWhitelistHandler = new IpWhitelistHandler(ipWhitelistService!);
-    this.proxyHandler = new ProxyHandler(sessionStore, serverManager);
-    this.backupHandler = new BackupHandler(sessionStore, serverManager, ipWhitelistService!);
+    this.proxyHandler = new ProxyHandler();
+    this.backupHandler = new BackupHandler(ipWhitelistService!);
     this.logHandler = new LogHandler();
     this.cloudflaredHandler = new CloudflaredHandler();
   }
@@ -109,7 +107,7 @@ export class ConfigController {
 
         // Cache Owner token for lazy start
         if (req.authContext?.role === UserRole.Owner && token) {
-          this.serverManager.setOwnerToken(token);
+          ServerManager.instance.setOwnerToken(token);
         }
       }
 

@@ -26,9 +26,13 @@ export class SessionStore {
   // Logger for SessionStore
   private logger = createLogger('SessionStore');
 
-  constructor(
-    private logService: LogService,
-  ) {}
+  static instance: SessionStore = new SessionStore();
+
+  static getInstance(): SessionStore {
+    return SessionStore.instance;
+  }
+
+  private constructor() {}
 
   /**
    * Create complete Session entity (ClientSession + ProxySession)
@@ -83,7 +87,6 @@ export class SessionStore {
       sessionId,
       userId,
       clientSession,
-      ServerManager.instance, // Use static instance
       sessionLogger, // Pass SessionLogger instead of LogService
       eventStore,
       (sessionId: string) => this.removeSingleSession(sessionId)
@@ -199,7 +202,7 @@ export class SessionStore {
       this.sessionLoggers.delete(sessionId);
 
       // 5. Remove from GlobalRequestRouter
-      GlobalRequestRouter.getInstance(this.logService, this).cleanupSessionNotifications(sessionId);
+      GlobalRequestRouter.getInstance().cleanupSessionNotifications(sessionId);
 
       // 6. Remove from user session mapping
       const userId = session.userId;
@@ -251,7 +254,7 @@ export class SessionStore {
         await session.close(DisconnectReason.ADMIN_REQUEST);
         this.eventStores.delete(sessionId); // Remove EventStore
         this.sessionLoggers.delete(sessionId); // Remove SessionLogger
-        GlobalRequestRouter.getInstance(this.logService, this).cleanupSessionNotifications(sessionId);
+        GlobalRequestRouter.getInstance().cleanupSessionNotifications(sessionId);
       }
     });
 
@@ -284,7 +287,7 @@ export class SessionStore {
     this.userSessions.clear();
     this.eventStores.clear(); // Remove all EventStore
     this.sessionLoggers.clear(); // Remove all SessionLogger
-    GlobalRequestRouter.getInstance(this.logService, this).cleanupAllSessionNotifications();
+    GlobalRequestRouter.getInstance().cleanupAllSessionNotifications();
   }
 
   /**

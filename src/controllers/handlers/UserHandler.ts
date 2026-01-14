@@ -21,10 +21,7 @@ export class UserHandler {
   // Logger for UserHandler
   private logger = createLogger('UserHandler');
 
-  constructor(
-    private sessionStore: SessionStore,
-    private serverManager: ServerManager
-  ) {}
+  constructor() {}
 
   /**
    * Disable user (1001)
@@ -305,7 +302,7 @@ export class UserHandler {
     await UserRepository.update(targetId, { status: UserStatus.Disabled });
 
     // Disconnect all active sessions for this user
-    await this.sessionStore.removeAllUserSessions(
+    await SessionStore.instance.removeAllUserSessions(
       targetId,
       DisconnectReason.USER_DISABLED
     );
@@ -334,7 +331,7 @@ export class UserHandler {
     await UserRepository.update(targetId, {permissions: permissions});
 
     // Get user sessions
-    const userSessions = this.sessionStore.getUserSessions(targetId);
+    const userSessions = SessionStore.instance.getUserSessions(targetId);
     if (userSessions.length > 0) {
       // Update permissions for all active sessions (takes effect immediately)
       for (const session of userSessions) {

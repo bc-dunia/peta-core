@@ -15,17 +15,14 @@ export class QueryHandler {
   // Logger for QueryHandler
   private logger = createLogger('QueryHandler');
 
-  constructor(
-    private sessionStore: SessionStore,
-    private serverManager: ServerManager
-  ) {}
+  constructor() {}
 
   /**
    * Get all server capabilities configuration (3002)
    */
   async handleGetAvailableServersCapabilities(request: AdminRequest<any>): Promise<{ capabilities: McpServerCapabilities }> {
-    const capabilities = this.serverManager.getAvailableServersCapabilities();
-    const servers = await this.serverManager.getAllServers();
+    const capabilities = ServerManager.instance.getAvailableServersCapabilities();
+    const servers = await ServerManager.instance.getAllServers();
     for (const server of servers) {
 
       if (!server.enabled) {
@@ -78,7 +75,7 @@ export class QueryHandler {
    * Get all server status (3004)
    */
   async handleGetServersStatus(request: AdminRequest<any>): Promise<{ serversStatus: { [serverID: string]: ServerStatus } }> {
-    const results = await this.serverManager.healthCheck();
+    const results = await ServerManager.instance.healthCheck();
     return {
       serversStatus: results
     };
@@ -90,7 +87,7 @@ export class QueryHandler {
   async handleGetServersCapabilities(request: AdminRequest<any>): Promise<{ capabilities: ServerConfigCapabilities }> {
     const { targetId } = request.data;
 
-    const serverContext = this.serverManager.getServerContext(targetId);
+    const serverContext = ServerManager.instance.getServerContext(targetId);
     if (!serverContext) {
       const serverEntity = await ServerRepository.findByServerId(targetId);
       if (!serverEntity) {
