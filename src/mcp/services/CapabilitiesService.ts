@@ -131,7 +131,7 @@ export class CapabilitiesService {
     // Iterate through all servers
     const allServers = await ServerManager.instance.getAllEnabledServers();
     for (const server of allServers) {
-      const configTemplate = server.configTemplate;
+      const configTemplate = server.allowUserInput ? server.configTemplate : '{}';
 
       const serverId = server.serverId;
       const enabled = permissions[serverId]?.enabled ?? server.publicAccess;
