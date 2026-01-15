@@ -1,13 +1,10 @@
 import { SessionStore } from '../../mcp/core/SessionStore.js';
-import { ServerManager } from '../../mcp/core/ServerManager.js';
 import { UserRepository } from '../../repositories/UserRepository.js';
 import { DisconnectReason } from '../../types/auth.types.js';
 import { Permissions } from '../../mcp/types/mcp.js';
-import { AuthUtils } from '../../utils/AuthUtils.js';
 import { AdminRequest, AdminError, AdminErrorCode } from '../../types/admin.types.js';
 import { prisma } from '../../config/prisma.js';
 import { UserRole, UserStatus, MCPEventLogType } from '../../types/enums.js';
-import { json } from 'stream/consumers';
 import { LogService } from '../../log/LogService.js';
 import { CapabilitiesService } from '../../mcp/services/CapabilitiesService.js';
 import { socketNotifier } from '../../socket/SocketNotifier.js';

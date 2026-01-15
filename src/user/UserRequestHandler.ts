@@ -15,6 +15,7 @@ import { SessionStore } from '../mcp/core/SessionStore.js';
 import { McpServerCapabilities } from '../mcp/types/mcp.js';
 import { createLogger } from '../logger/index.js';
 import { socketNotifier } from '../socket/SocketNotifier.js';
+import { ServerAuthType } from '../types/enums.js';
 import {
   UserError,
   UserErrorCode,
@@ -379,7 +380,6 @@ export class UserRequestHandler {
     }
 
     // Handle OAuth expiration dates dynamically
-    const { ServerAuthType } = require('../types/enums.js');
     if (template.authType === ServerAuthType.NotionAuth && !processedConfig.oauth?.expiresAt) {
       processedConfig.oauth = processedConfig.oauth || {};
       processedConfig.oauth.expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;

@@ -17,7 +17,6 @@ import { createLogger } from '../logger/index.js';
  */
 export class UserController {
   private logger = createLogger('UserController');
-  private userRequestHandler: UserRequestHandler = UserRequestHandler.instance;
 
   static instance: UserController = new UserController();
   static getInstance(): UserController {
@@ -69,17 +68,17 @@ export class UserController {
       switch (userRequest.action) {
         // ==================== Capability Operations (1000-1999) ====================
         case UserActionType.GET_CAPABILITIES:
-          result = await this.userRequestHandler.handleGetCapabilities(userId);
+          result = await UserRequestHandler.instance.handleGetCapabilities(userId);
           break;
 
         case UserActionType.SET_CAPABILITIES:
-          await this.userRequestHandler.handleSetCapabilities(userId, userRequest.data);
+          await UserRequestHandler.instance.handleSetCapabilities(userId, userRequest.data);
           result = { message: 'Capabilities updated successfully' };
           break;
 
         // ==================== Server Configuration Operations (2000-2999) ====================
         case UserActionType.CONFIGURE_SERVER:
-          result = await this.userRequestHandler.handleConfigureServer(
+          result = await UserRequestHandler.instance.handleConfigureServer(
             userId,
             token,
             userRequest.data
@@ -87,12 +86,12 @@ export class UserController {
           break;
 
         case UserActionType.UNCONFIGURE_SERVER:
-          result = await this.userRequestHandler.handleUnconfigureServer(userId, userRequest.data);
+          result = await UserRequestHandler.instance.handleUnconfigureServer(userId, userRequest.data);
           break;
 
         // ==================== Session Query Operations (3000-3999) ====================
         case UserActionType.GET_ONLINE_SESSIONS:
-          result = await this.userRequestHandler.handleGetOnlineSessions(userId);
+          result = await UserRequestHandler.instance.handleGetOnlineSessions(userId);
           break;
 
         default:

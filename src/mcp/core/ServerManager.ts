@@ -87,7 +87,7 @@ export class ServerManager {
 
   static readonly instance: ServerManager = new ServerManager();
 
-  constructor() {
+  private constructor() {
 
     this.getAllEnabledServers().then((servers) => {
       for (const server of servers) {

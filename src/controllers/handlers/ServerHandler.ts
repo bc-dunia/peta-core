@@ -9,17 +9,14 @@ import { LogService } from '../../log/LogService.js';
 import { MCPEventLogType, ServerCategory, ServerStatus } from '../../types/enums.js';
 import { socketNotifier } from '../../socket/SocketNotifier.js';
 import { ServerContext } from '../../mcp/core/ServerContext.js';
-import { Permissions } from '../../mcp/types/mcp.js';
 import UserRepository from '../../repositories/UserRepository.js';
 import { ClientSession } from '../../mcp/core/ClientSession.js';
 import { createLogger } from '../../logger/index.js';
-import { CapabilitiesService } from '../../mcp/services/CapabilitiesService.js';
 
 /**
  * Server operation handler (2000-2999)
  */
 export class ServerHandler {
-  private serverRepository = ServerRepository;
   
   // Logger for ServerHandler
   private logger = createLogger('ServerHandler');

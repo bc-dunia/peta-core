@@ -1,9 +1,7 @@
-import { SessionStore } from '../../mcp/core/SessionStore.js';
 import { ServerManager } from '../../mcp/core/ServerManager.js';
-import { UserRepository } from '../../repositories/UserRepository.js';
 import { ServerRepository } from '../../repositories/ServerRepository.js';
 import { AdminRequest, AdminError, AdminErrorCode } from '../../types/admin.types.js';
-import { McpServerCapabilities, Permissions, ServerConfigCapabilities, ServerConfigWithEnabled } from '../../mcp/types/mcp.js';
+import { McpServerCapabilities, ServerConfigCapabilities } from '../../mcp/types/mcp.js';
 import { ServerStatus } from '../../types/enums.js';
 import { CapabilitiesService } from '../../mcp/services/CapabilitiesService.js';
 import { createLogger } from '../../logger/index.js';
