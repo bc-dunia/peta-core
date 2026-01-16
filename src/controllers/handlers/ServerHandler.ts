@@ -376,7 +376,9 @@ export class ServerHandler {
       requestParams: JSON.stringify({ serverId: serverId })
     });
 
-    server.configTemplate = null;
+    if (server.category !== ServerCategory.RestApi) {
+      server.configTemplate = null;
+    }
     server.transportType = null;
     server.cachedTools = null;
     server.cachedResources = null;
@@ -619,7 +621,7 @@ export class ServerHandler {
       throw new AdminError(`Server ${targetId} not found`, AdminErrorCode.SERVER_NOT_FOUND);
     }
 
-    if (entity.allowUserInput) {
+    if (entity.allowUserInput && entity.category !== ServerCategory.RestApi) {
       throw new AdminError(`Server ${targetId} is a template server and cannot be updated`, AdminErrorCode.INVALID_REQUEST);
     }
 
