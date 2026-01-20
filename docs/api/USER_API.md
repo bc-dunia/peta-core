@@ -261,9 +261,18 @@ User API permissions are simple and straightforward:
 
 #### 2001 CONFIGURE_SERVER
 
-**Function**: Configure a user-specific server with authentication credentials. Creates temporary server instance for this user.
+**Function**: Configure a user-specific server with authentication credentials. Creates temporary server instance for this user. Supports three server categories with different authentication methods.
+
+**Server Category Types**:
+- **Template (1)**: Pre-configured servers requiring API key substitution (e.g., Notion, Figma, GitHub)
+- **CustomRemote (2)**: Custom MCP servers accessed via HTTP/SSE with dynamic authentication
+- **RestApi (3)**: RESTful API servers with standardized authentication methods
+
+**Important**: Only one authentication parameter should be provided based on the server's category. Providing the wrong auth parameter will result in `SERVER_CONFIG_INVALID` error.
 
 **Request Parameters** (data):
+
+*Example 1: Template Server (category=1)*
 ```json
 {
   "serverId": "notion",
@@ -277,12 +286,102 @@ User API permissions are simple and straightforward:
 }
 ```
 
+*Example 2: CustomRemote Server (category=2)*
+```json
+{
+  "serverId": "custom-mcp-server",
+  "remoteAuth": {
+    "params": {
+      "api_key": "your-api-key",
+      "user_id": "12345"
+    },
+    "headers": {
+      "Authorization": "Bearer token123",
+      "X-Custom-Header": "value"
+    }
+  }
+}
+```
+
+*Example 3a: RestApi Server with Bearer Auth (category=3)*
+```json
+{
+  "serverId": "rest-api-server",
+  "restfulApiAuth": {
+    "type": "bearer",
+    "value": "your-bearer-token"
+  }
+}
+```
+
+*Example 3b: RestApi Server with Basic Auth*
+```json
+{
+  "serverId": "rest-api-server",
+  "restfulApiAuth": {
+    "type": "basic",
+    "username": "user123",
+    "password": "pass456"
+  }
+}
+```
+
+*Example 3c: RestApi Server with Custom Header Auth*
+```json
+{
+  "serverId": "rest-api-server",
+  "restfulApiAuth": {
+    "type": "header",
+    "header": "X-API-Key",
+    "value": "your-api-key"
+  }
+}
+```
+
+*Example 3d: RestApi Server with Query Parameter Auth*
+```json
+{
+  "serverId": "rest-api-server",
+  "restfulApiAuth": {
+    "type": "query_param",
+    "param": "apikey",
+    "value": "your-api-key"
+  }
+}
+```
+
 **Parameter Description**:
 - `serverId` (string, required): Server ID to configure
-- `authConf` (array, required): Authentication configuration array
-  - `key` (string): Placeholder key from server's configTemplate (e.g., `{{API_KEY}}`)
-  - `value` (string): Actual credential value to substitute
-  - `dataType` (number): Data type (currently only `1` = string replacement is supported)
+
+**Authentication Parameters** (one required based on server category):
+
+**For Template Servers (category=1)**:
+- `authConf` (array, required for Template): Authentication configuration array
+  - `key` (string): Placeholder key from configTemplate (e.g., `{{API_KEY}}`, `{{NOTION_API_KEY}}`)
+  - `value` (string): Actual credential value to substitute into placeholder
+  - `dataType` (number): Data type identifier (currently only `1` = string replacement is supported)
+
+**For CustomRemote Servers (category=2)**:
+- `remoteAuth` (object, required for CustomRemote): Remote server authentication configuration
+  - `params` (object, optional): Key-value pairs to append as URL query parameters
+    - Example: `{"api_key": "abc123", "user_id": "456"}` → `?api_key=abc123&user_id=456`
+    - At least one of `params` or `headers` must be non-empty
+  - `headers` (object, optional): Key-value pairs to add as HTTP request headers
+    - Example: `{"Authorization": "Bearer token", "X-Custom": "value"}`
+    - At least one of `params` or `headers` must be non-empty
+
+**For RestApi Servers (category=3)**:
+- `restfulApiAuth` (object, required for RestApi): RESTful API authentication configuration
+  - `type` (string, required): Authentication type - one of:
+    - `"bearer"` - Bearer token authentication (requires `value`)
+    - `"basic"` - HTTP Basic authentication (requires `username` and `password`)
+    - `"header"` - Custom header authentication (requires `header` and `value`)
+    - `"query_param"` - Query parameter authentication (requires `param` and `value`)
+  - `value` (string, conditional): Auth token/value - required for `bearer`, `header`, `query_param` types
+  - `header` (string, conditional): HTTP header name - required for `header` type
+  - `param` (string, conditional): Query parameter name - required for `query_param` type
+  - `username` (string, conditional): Username - required for `basic` type
+  - `password` (string, conditional): Password - required for `basic` type
 
 **Return Result** (data):
 ```json
@@ -297,12 +396,29 @@ User API permissions are simple and straightforward:
    - Check server exists in database
    - Verify `server.allowUserInput === true`
    - Verify `server.enabled === true`
-   - Verify `server.configTemplate` exists
-2. **Configuration Assembly**:
+   - Verify `server.configTemplate` exists (or `launchConfig` for RestApi)
+2. **Configuration Assembly** (branched by server.category):
+
+   **For Template Servers (category=1)**:
+   - Requires `authConf` parameter (must not be empty)
    - Parse server's `configTemplate` JSON
    - Extract `mcpJsonConf` from template
    - Replace placeholders with user-provided credentials
    - Handle OAuth expiration dates dynamically (Notion: 30 days, Figma: 90 days)
+
+   **For CustomRemote Servers (category=2)**:
+   - Requires `remoteAuth` parameter with at least params or headers
+   - Parse server's `configTemplate` to get base URL
+   - Append `remoteAuth.params` as query string to URL (if provided)
+   - Merge `remoteAuth.headers` into request headers (if provided)
+   - Create launchConfig: `{ url: "...", headers: {...} }`
+
+   **For RestApi Servers (category=3)**:
+   - Requires `restfulApiAuth` parameter (must not be empty)
+   - Parse server's existing `launchConfig`
+   - Add `restfulApiAuth` as `auth` field to launchConfig
+   - Auth types validated per AuthConfigSchema (bearer/basic/header/query_param)
+
 3. **Encryption and Storage**:
    - Encrypt launchConfig using user's token as encryption key
    - Save to `user.launchConfigs` database field
@@ -319,15 +435,25 @@ User API permissions are simple and straightforward:
 - `SERVER_NOT_FOUND (2001)`: Specified serverId doesn't exist
 - `SERVER_DISABLED (2002)`: Server is disabled by admin
 - `SERVER_NOT_ALLOW_USER_INPUT (2004)`: Server doesn't allow user configuration
-- `SERVER_NO_CONFIG_TEMPLATE (2005)`: Server missing configTemplate
-- `SERVER_CONFIG_INVALID (2003)`: Invalid authConf format or configTemplate JSON
+- `SERVER_NO_CONFIG_TEMPLATE (2005)`: Server missing configTemplate (or launchConfig for RestApi)
+- `SERVER_CONFIG_INVALID (2003)`: Invalid configuration - specific causes:
+  - **Template servers**: `authConf` is required but missing/empty
+  - **CustomRemote servers**:
+    - `remoteAuth` is required but missing
+    - Both `params` and `headers` are empty (at least one required)
+    - `configTemplate` is missing or empty
+  - **RestApi servers**:
+    - `restfulApiAuth` is required but missing/empty
+    - Missing required fields for auth type (e.g., `value` for bearer, `username`/`password` for basic)
+  - **General**: Wrong auth parameter for server category (e.g., sending `authConf` to RestApi server)
+  - Invalid configTemplate JSON or credential replacement resulted in invalid JSON
 
 **Security Notes**:
 - Credentials are encrypted with user's token (AES-256-GCM)
 - Only the user who configured the server can decrypt the credentials
 - Temporary servers are isolated per-user (no cross-user access)
 
-**Use Case**: User configures personal Notion/Figma/GitHub integration with their own API keys
+**Use Case**: User configures personal server integration with their own credentials (Notion/Figma/GitHub API keys, custom remote servers, or RESTful APIs)
 
 ---
 
