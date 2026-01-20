@@ -15,7 +15,7 @@ import { SessionStore } from '../mcp/core/SessionStore.js';
 import { McpServerCapabilities } from '../mcp/types/mcp.js';
 import { createLogger } from '../logger/index.js';
 import { socketNotifier } from '../socket/SocketNotifier.js';
-import { ServerAuthType, ServerCategory } from '../types/enums.js';
+import { DangerLevel, ServerAuthType, ServerCategory } from '../types/enums.js';
 import { EncryptedData } from '../security/CryptoService.js';
 import {
   UserError,
@@ -105,91 +105,67 @@ export class UserRequestHandler {
     submitted: McpServerCapabilities,
     current: McpServerCapabilities
   ): McpServerCapabilities {
-    const validated: McpServerCapabilities = {};
+    // Start with a deep copy of current so non-overridable fields stay intact
+    const merged: McpServerCapabilities = JSON.parse(JSON.stringify(current));
 
-    // Iterate through each server submitted by user
-    for (const [serverId, serverConfig] of Object.entries(submitted)) {
-      // Check if server exists
-      if (!current[serverId]) {
-        this.logger.debug({ serverId }, 'Skipping unknown serverId');
-        continue;
+    for (const [serverId, currentServer] of Object.entries(current)) {
+      const submittedServer = submitted[serverId] as any;
+      if (!submittedServer) {
+        continue; // no updates for this server, keep current as-is
       }
 
-      const currentServer = current[serverId] as any;
-      const submittedServer = serverConfig as any;
+      if (typeof submittedServer.enabled === 'boolean') {
+        merged[serverId].enabled = submittedServer.enabled;
+      }
 
-      // Initialize configuration for this server
-      validated[serverId] = {
-        enabled: typeof submittedServer.enabled === 'boolean' ? submittedServer.enabled : true,
-        serverName: currentServer.serverName,
-        tools: {},
-        resources: {},
-        prompts: {}
-      } as any;
+      // Tools: enabled + dangerLevel
+      for (const [toolName, currentTool] of Object.entries(currentServer.tools || {})) {
+        const submittedTool = submittedServer.tools?.[toolName];
+        if (!submittedTool) continue;
 
-      // Extract enabled for tools
-      if (submittedServer.tools) {
-        for (const [toolName, toolConfig] of Object.entries(submittedServer.tools)) {
-          if (currentServer.tools && currentServer.tools[toolName]) {
-            const tc = toolConfig as any;
-            if (typeof tc.enabled === 'boolean') {
-              validated[serverId].tools[toolName] = {
-                enabled: tc.enabled,
-                description: tc.description,
-                dangerLevel: tc.dangerLevel
-              };
-            }
+        if (typeof submittedTool.enabled === 'boolean') {
+          merged[serverId].tools[toolName].enabled = submittedTool.enabled;
+        }
+
+        if (submittedTool.dangerLevel !== undefined) {
+          Object.keys(DangerLevel).includes(submittedTool.dangerLevel.toString());
+          if (this.isValidDangerLevel(submittedTool.dangerLevel)) {
+            merged[serverId].tools[toolName].dangerLevel = submittedTool.dangerLevel;
           } else {
-            this.logger.debug({ serverId, toolName }, 'Skipping unknown tool');
+            this.logger.debug(
+              { serverId, toolName, dangerLevel: submittedTool.dangerLevel },
+              'Skipping invalid dangerLevel'
+            );
           }
         }
       }
 
-      // Extract enabled for resources
-      if (submittedServer.resources) {
-        for (const [resourceName, resourceConfig] of Object.entries(submittedServer.resources)) {
-          if (currentServer.resources && currentServer.resources[resourceName]) {
-            const rc = resourceConfig as any;
-            if (typeof rc.enabled === 'boolean') {
-              validated[serverId].resources[resourceName] = {
-                enabled: rc.enabled,
-                description: rc.description
-              };
-            }
-          } else {
-            this.logger.debug({ serverId, resourceName }, 'Skipping unknown resource');
-          }
+      // Resources: only enabled
+      for (const [resourceName] of Object.entries(currentServer.resources || {})) {
+        const submittedResource = submittedServer.resources?.[resourceName];
+        if (!submittedResource) continue;
+
+        if (typeof submittedResource.enabled === 'boolean') {
+          merged[serverId].resources[resourceName].enabled = submittedResource.enabled;
         }
       }
 
-      // Extract enabled for prompts
-      if (submittedServer.prompts) {
-        for (const [promptName, promptConfig] of Object.entries(submittedServer.prompts)) {
-          if (currentServer.prompts && currentServer.prompts[promptName]) {
-            const pc = promptConfig as any;
-            if (typeof pc.enabled === 'boolean') {
-              validated[serverId].prompts[promptName] = {
-                enabled: pc.enabled,
-                description: pc.description
-              };
-            }
-          } else {
-            this.logger.debug({ serverId, promptName }, 'Skipping unknown prompt');
-          }
-        }
-      }
+      // Prompts: only enabled
+      for (const [promptName] of Object.entries(currentServer.prompts || {})) {
+        const submittedPrompt = submittedServer.prompts?.[promptName];
+        if (!submittedPrompt) continue;
 
-      // If this server has no valid configuration, delete it
-      if (
-        Object.keys(validated[serverId].tools).length === 0 &&
-        Object.keys(validated[serverId].resources).length === 0 &&
-        Object.keys(validated[serverId].prompts).length === 0
-      ) {
-        delete validated[serverId];
+        if (typeof submittedPrompt.enabled === 'boolean') {
+          merged[serverId].prompts[promptName].enabled = submittedPrompt.enabled;
+        }
       }
     }
 
-    return validated;
+    return merged;
+  }
+
+  private isValidDangerLevel(value: any): value is DangerLevel {
+    return Object.values(DangerLevel).filter((v): v is number => typeof v === 'number').includes(value);
   }
 
   /**
