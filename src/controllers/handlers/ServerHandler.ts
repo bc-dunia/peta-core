@@ -6,7 +6,7 @@ import { AdminRequest, AdminError, AdminErrorCode } from '../../types/admin.type
 import { Server } from '@prisma/client';
 import { prisma } from '../../config/prisma.js';
 import { LogService } from '../../log/LogService.js';
-import { MCPEventLogType, ServerCategory, ServerStatus } from '../../types/enums.js';
+import { MCPEventLogType, ServerAuthType, ServerCategory, ServerStatus } from '../../types/enums.js';
 import { socketNotifier } from '../../socket/SocketNotifier.js';
 import { ServerContext } from '../../mcp/core/ServerContext.js';
 import UserRepository from '../../repositories/UserRepository.js';
@@ -189,7 +189,7 @@ export class ServerHandler {
       allowUserInput: allowUserInputValue,
       proxyId: proxyId ?? 0,
       toolTmplId: toolTmplId ?? null,
-      authType: authType ?? 1,
+      authType: authType ?? ServerAuthType.ApiKey,
       configTemplate: configTemplate || '{}',
       category: category,
       lazyStartEnabled: lazyStartEnabled,

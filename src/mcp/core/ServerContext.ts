@@ -216,6 +216,7 @@ export class ServerContext {
       serverName: this.serverEntity.serverName,
       allowUserInput: this.serverEntity.allowUserInput,
       authType: this.serverEntity.authType,
+      category: this.serverEntity.category,
       configTemplate: this.serverEntity.configTemplate || '',
       configured: true,  // ServerContext only exists for configured servers
       tools,

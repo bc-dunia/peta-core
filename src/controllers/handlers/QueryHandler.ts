@@ -38,8 +38,8 @@ export class QueryHandler {
         serverName: server.serverName,
         allowUserInput: server.allowUserInput,
         authType: server.authType,
-        configTemplate: server.configTemplate || '',
-        configured: false,
+        configTemplate: '{}',
+        configured: true,
         tools: serverCapabilities.tools ?? {},
         resources: serverCapabilities.resources ?? {},
         prompts: serverCapabilities.prompts ?? {}

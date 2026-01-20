@@ -1,8 +1,8 @@
 import { UserRepository } from '../repositories/UserRepository.js';
 import { AuthContext, AuthError, AuthErrorType, isValidPermissions } from '../types/auth.types.js';
-import { UserStatus, UserRole } from '../types/enums.js';
+import { UserStatus } from '../types/enums.js';
 import { CryptoService } from './CryptoService.js';
-import { McpServerCapabilities, Permissions } from '../mcp/types/mcp.js';
+import { Permissions } from '../mcp/types/mcp.js';
 
 export class TokenValidator {
 

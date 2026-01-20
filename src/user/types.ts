@@ -93,11 +93,13 @@ export interface SessionData {
  */
 export interface ConfigureServerRequest {
   serverId: string;
-  authConf: Array<{
+  authConf?: Array<{
     key: string;
     value: string;
     dataType: number;
   }>;
+  restfulApiAuth?: Map<any, any>;
+  remoteAuth?: { params: Record<string, any>; headers: Record<string, any> };
 }
 
 /**

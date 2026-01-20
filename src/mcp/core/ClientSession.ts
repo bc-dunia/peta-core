@@ -1,5 +1,5 @@
 import { ClientSessionStatus, MCPEventLogType, DangerLevel, ServerStatus } from '../../types/enums.js';
-import { McpServerCapabilities, Permissions, ServerConfigCapabilities, ServerConfigWithEnabled } from '../types/mcp.js';
+import { Permissions } from '../types/mcp.js';
 import { Implementation } from '@modelcontextprotocol/sdk/types.js';
 import { ServerContext } from './ServerContext.js';
 import { AuthContext, DisconnectReason } from '../../types/auth.types.js';
@@ -8,8 +8,6 @@ import { ServerManager } from './ServerManager.js';
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { ProxySession } from './ProxySession.js';
 import { LogService } from '../../log/LogService.js';
-import UserRepository from '../../repositories/UserRepository.js';
-import { User } from '@prisma/client';
 import ServerRepository from '../../repositories/ServerRepository.js';
 import { createLogger } from '../../logger/index.js';
 import { socketNotifier } from '../../socket/SocketNotifier.js';

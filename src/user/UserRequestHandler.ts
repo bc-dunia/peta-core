@@ -15,7 +15,8 @@ import { SessionStore } from '../mcp/core/SessionStore.js';
 import { McpServerCapabilities } from '../mcp/types/mcp.js';
 import { createLogger } from '../logger/index.js';
 import { socketNotifier } from '../socket/SocketNotifier.js';
-import { ServerAuthType } from '../types/enums.js';
+import { ServerAuthType, ServerCategory } from '../types/enums.js';
+import { EncryptedData } from '../security/CryptoService.js';
 import {
   UserError,
   UserErrorCode,
@@ -180,7 +181,6 @@ export class UserRequestHandler {
 
       // If this server has no valid configuration, delete it
       if (
-        validated[serverId].enabled === undefined &&
         Object.keys(validated[serverId].tools).length === 0 &&
         Object.keys(validated[serverId].resources).length === 0 &&
         Object.keys(validated[serverId].prompts).length === 0
@@ -206,7 +206,7 @@ export class UserRequestHandler {
     userToken: string,
     data: ConfigureServerRequest
   ): Promise<ConfigureServerResponseData> {
-    const { serverId, authConf } = data;
+    const { serverId, authConf, restfulApiAuth, remoteAuth } = data;
     this.logger.debug({ userId, serverId }, 'Configuring server for user');
 
     // Import dependencies dynamically
@@ -214,7 +214,6 @@ export class UserRequestHandler {
     const UserRepository = (await import('../repositories/UserRepository.js')).default;
     const { CryptoService } = await import('../security/CryptoService.js');
     const { ServerManager } = await import('../mcp/core/ServerManager.js');
-    const { ServerAuthType } = await import('../types/enums.js');
 
     // 1. Validate server exists and allowUserInput=true and enabled=true
     const server = await ServerRepository.findByServerId(serverId);
@@ -241,16 +240,59 @@ export class UserRequestHandler {
       );
     }
 
-    // 2. Assemble and encrypt launchConfig
-    const launchConfig = this.assembleLaunchConfig(server.configTemplate, authConf);
-    const launchConfigStr = JSON.stringify(launchConfig);
-    const encryptedLaunchConfig = await CryptoService.encryptData(launchConfigStr, userToken);
-
-    // 3. Save to user.launchConfigs
+    // 2. Save to user.launchConfigs
     const user = await UserRepository.findById(userId);
     if (!user) {
       throw new UserError(`User ${userId} not found`, UserErrorCode.INTERNAL_ERROR);
     }
+
+    // 3. Assemble and encrypt launchConfig
+    let launchConfig: any;
+    switch (server.category) {
+      case ServerCategory.Template:
+        if (authConf === undefined || authConf === null || authConf.length === 0) {
+          throw new UserError(`authConf is required and cannot be empty`, UserErrorCode.SERVER_CONFIG_INVALID);
+        }
+        launchConfig = this.assembleLaunchConfig(server.configTemplate, authConf);
+        break;
+      case ServerCategory.CustomRemote:
+        if (remoteAuth === undefined || remoteAuth === null || (remoteAuth.params.length === 0 && remoteAuth.headers.length === 0) ) {
+          throw new UserError(`remoteAuth is required and cannot be empty and must contain either params or headers`, UserErrorCode.SERVER_CONFIG_INVALID);
+        }
+        if (server.configTemplate === '' || server.configTemplate === '{}') {
+          throw new UserError(`Server ${serverId} does not have a configuration template`, UserErrorCode.SERVER_NO_CONFIG_TEMPLATE);
+        }
+        const configTemplate = JSON.parse(server.configTemplate);
+        let url = configTemplate.url;
+        if (remoteAuth.params && Object.keys(remoteAuth.params).length > 0) {
+          if (url.includes('?')) {
+            const urlParts = url.split('?');
+            const urlParams = new URLSearchParams(remoteAuth.params);
+            url = urlParts[0];
+            url = `${url}?${urlParams.toString()}`;
+          } else {
+            url = `${url}?${new URLSearchParams(remoteAuth.params).toString()}`;
+          }
+        }
+        launchConfig = {
+          url: url,
+          headers: {
+            ...remoteAuth.headers,
+          },
+        }
+        break;
+      case ServerCategory.RestApi:
+        if (restfulApiAuth === undefined || restfulApiAuth === null || restfulApiAuth.size === 0) {
+          throw new UserError(`restfulApiAuth is required and cannot be empty`, UserErrorCode.SERVER_CONFIG_INVALID);
+        }
+        launchConfig = JSON.parse(server.launchConfig);
+        launchConfig.auth = restfulApiAuth;
+        break;
+      default:
+        throw new UserError(`Invalid server category: ${server.category}`, UserErrorCode.SERVER_CONFIG_INVALID);
+    }
+
+    const encryptedLaunchConfig = await CryptoService.encryptData(JSON.stringify(launchConfig), userToken);
 
     const launchConfigs = JSON.parse(user.launchConfigs || '{}');
     launchConfigs[serverId] = encryptedLaunchConfig;

@@ -469,7 +469,7 @@ export class ServerManager {
         mcpCaps.tools = {};
         mcpCaps.resources = {};
         mcpCaps.prompts = {};
-        mcpCaps.configured = false;
+        mcpCaps.configured = true;
       }
       capabilities[context.serverID] = mcpCaps;
     }
@@ -768,8 +768,13 @@ export class ServerManager {
       if (serverEntity.category === ServerCategory.CustomRemote) {
         const serverInfo = client.getServerVersion();
         if (serverInfo?.name != serverEntity.serverName && serverInfo?.name ) {
+          let name = serverInfo.name.trim();
+          if (serverEntity.allowUserInput) {
+            name += ' Personal';
+          }
+
           await ServerRepository.update(serverEntity.serverId, {
-            serverName: serverInfo.name
+            serverName: name
           });
         }
         serverEntity.serverName = serverInfo?.name ?? serverEntity.serverName;
