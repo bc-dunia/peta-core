@@ -236,7 +236,7 @@ export class ServerHandler {
         where: { serverId },
         select
       });
-      if (server && server.category !== ServerCategory.RestApi) {
+      if (server && server.category === ServerCategory.Template) {
         server.configTemplate = null;
       }
       return { servers: server ? [server] : [] };
@@ -253,7 +253,7 @@ export class ServerHandler {
 
     const servers = await prisma.server.findMany({ where, select });
     for (const server of servers) {
-      if (server.category !== ServerCategory.RestApi) {
+      if (server.category === ServerCategory.Template) {
         server.configTemplate = null;
       }
     }
