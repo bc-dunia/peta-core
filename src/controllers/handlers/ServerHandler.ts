@@ -283,7 +283,8 @@ export class ServerHandler {
         AdminErrorCode.INVALID_REQUEST
       );
     }
-    if (existingServer.category !== ServerCategory.RestApi && configTemplate !== undefined) {
+    const isRestApiOrCustomRemote = existingServer.category === ServerCategory.RestApi || existingServer.category === ServerCategory.CustomRemote;
+    if (!isRestApiOrCustomRemote && configTemplate !== undefined) {
       throw new AdminError(
         'configTemplate field is immutable after server creation',
         AdminErrorCode.INVALID_REQUEST
@@ -296,13 +297,13 @@ export class ServerHandler {
     if (launchConfig !== undefined) {
       updateData.launchConfig = typeof launchConfig === 'string' ? launchConfig : JSON.stringify(launchConfig);
     }
-    if (existingServer.category === ServerCategory.RestApi && configTemplate !== undefined) {
+    if (isRestApiOrCustomRemote && configTemplate !== undefined && configTemplate !== null && configTemplate.trim() !== '' && configTemplate.trim() !== existingServer.configTemplate) {
       updateData.configTemplate = configTemplate;
     }
-    if (lazyStartEnabled !== undefined) {
+    if (lazyStartEnabled !== undefined && lazyStartEnabled !== existingServer.lazyStartEnabled) {
       updateData.lazyStartEnabled = lazyStartEnabled;
     }
-    if (publicAccess !== undefined) {
+    if (publicAccess !== undefined && publicAccess !== existingServer.publicAccess) {
       updateData.publicAccess = publicAccess;
     }
 
@@ -322,26 +323,29 @@ export class ServerHandler {
     if (existingServer.enabled === true && updateData.enabled === true) {
       // Server remains enabled
       if (updateData.capabilities !== undefined && updateData.launchConfig !== undefined) {
-        this.updateServerLaunchConfig(serverId, updateData.launchConfig, token);
+        await this.updateServerLaunchConfig(serverId, updateData.launchConfig, token);
       } else if (updateData.capabilities !== undefined) {
         await this.updateServerCapabilities(serverId, updateData.capabilities);
         serverContext = await this.updateLazyStartEnabled(existingServer, server, updateData.lazyStartEnabled);
       } else if (updateData.launchConfig !== undefined) {
-        this.updateServerLaunchConfig(serverId, updateData.launchConfig, token);
+        await this.updateServerLaunchConfig(serverId, updateData.launchConfig, token);
       } else if (updateData.lazyStartEnabled !== undefined) {
         serverContext = await this.updateLazyStartEnabled(existingServer, server, updateData.lazyStartEnabled);
       }
-      if (willHandlePublicAccessChange) {
-        if (existingServer.allowUserInput) {
-          const temporaryServers = ServerManager.instance.getTemporaryServers(serverId);
-          for (const temporaryServer of temporaryServers) {
-            temporaryServer.serverEntity = server;
+      if (existingServer.allowUserInput) {
+        const temporaryServers = ServerManager.instance.getTemporaryServers(serverId);
+        for (const temporaryServer of temporaryServers) {
+          temporaryServer.serverEntity = server;
+          if (willHandlePublicAccessChange) {
             serverContext = temporaryServer;
           }
-        } else {
-          serverContext = ServerManager.instance.getServerContext(serverId);
-          if (serverContext) {
-            serverContext.serverEntity = server;
+        }
+      } else {
+        const context = serverContext = ServerManager.instance.getServerContext(serverId);
+        if (context) {
+          context.serverEntity = server;
+          if (willHandlePublicAccessChange) {
+            serverContext = context;
           }
         }
       }
@@ -621,7 +625,7 @@ export class ServerHandler {
       throw new AdminError(`Server ${targetId} not found`, AdminErrorCode.SERVER_NOT_FOUND);
     }
 
-    if (entity.allowUserInput && entity.category !== ServerCategory.RestApi) {
+    if (entity.allowUserInput && !(entity.category === ServerCategory.RestApi || entity.category === ServerCategory.CustomRemote)) {
       throw new AdminError(`Server ${targetId} is a template server and cannot be updated`, AdminErrorCode.INVALID_REQUEST);
     }
 
