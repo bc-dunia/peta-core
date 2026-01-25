@@ -179,7 +179,7 @@ export class ConfigController {
           if (req.authContext?.role !== UserRole.Owner) {
             throw new AdminError('Only Owner role can create server.', AdminErrorCode.FORBIDDEN);
           }
-          result = await this.serverHandler.handleCreateServer(adminRequest);
+          result = await this.serverHandler.handleCreateServer(adminRequest, token!);
           break;
         case AdminActionType.GET_SERVERS:
           result = await this.serverHandler.handleGetServers(adminRequest);

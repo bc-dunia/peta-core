@@ -12,6 +12,8 @@ import { ServerContext } from '../../mcp/core/ServerContext.js';
 import UserRepository from '../../repositories/UserRepository.js';
 import { ClientSession } from '../../mcp/core/ClientSession.js';
 import { createLogger } from '../../logger/index.js';
+import { CryptoService } from '../../security/CryptoService.js';
+import { exchangeAuthorizationCode } from '../../mcp/oauth/exchange.js';
 
 /**
  * Server operation handler (2000-2999)
@@ -144,7 +146,7 @@ export class ServerHandler {
   /**
    * Create server (2010)
    */
-  async handleCreateServer(request: AdminRequest<any>): Promise<any> {
+  async handleCreateServer(request: AdminRequest<any>, token: string): Promise<any> {
     const { serverId, serverName, enabled, launchConfig, capabilities, createdAt, updatedAt, allowUserInput, proxyId, toolTmplId, authType, configTemplate, category, lazyStartEnabled, publicAccess } = request.data;
 
     if (!serverId) {
@@ -158,31 +160,102 @@ export class ServerHandler {
     }
 
     // launchConfig must be a string
-    if (typeof launchConfig !== 'string') {
-      throw new AdminError('launchConfig must be a string', AdminErrorCode.INVALID_REQUEST);
+    if (typeof launchConfig !== 'string' || launchConfig.trim() === '' || launchConfig.trim() === '{}') {
+      throw new AdminError('launchConfig must be a string and cannot be empty', AdminErrorCode.INVALID_REQUEST);
     }
 
     // Validate consistency between allowUserInput and configTemplate
     const allowUserInputValue = allowUserInput ?? false;
 
-    if (allowUserInputValue === true) {
-      if (!configTemplate || configTemplate.trim() === '' || configTemplate.trim() === '{}') {
-        throw new AdminError(
-          'For servers with allowUserInput=true, configTemplate is required',
-          AdminErrorCode.INVALID_REQUEST
-        );
-      }
+    if (!configTemplate || configTemplate.trim() === '' || configTemplate.trim() === '{}') {
+      throw new AdminError(
+        'For servers with allowUserInput=true, configTemplate is required',
+        AdminErrorCode.INVALID_REQUEST
+      );
     }
 
     if (typeof category !== 'number' || !Object.values(ServerCategory).includes(category as ServerCategory)) {
       throw new AdminError('Invalid category', AdminErrorCode.INVALID_REQUEST);
     }
 
+    let launchConfigStr = launchConfig;
+    if (category === ServerCategory.Template && allowUserInputValue === false) {
+      const configTemplateValue = JSON.parse(configTemplate || '{}');
+      const oauthConfig = configTemplateValue.oAuthConfig;
+      if (oauthConfig && oauthConfig.clientId) {
+        const decryptedLaunchConfig = await CryptoService.decryptDataFromString(launchConfig, token);
+        const decryptedLaunchConfigValue = JSON.parse(decryptedLaunchConfig);
+        const oauth = decryptedLaunchConfigValue.oauth;
+        if (oauth && oauth.code) {
+          if (oauth.clientId === oauthConfig.clientId) {
+            // user peta client id
+            // TODO: Implement this
+            this.logger.info('User peta client id');
+            throw new AdminError('User peta client id', AdminErrorCode.INVALID_REQUEST);
+          } else {
+            // Use the client ID provided by the user
+            if ( !oauth.clientId || oauth.clientId.trim() === '' || !oauth.clientSecret || oauth.clientSecret.trim() === '') {
+              throw new AdminError('Invalid OAuth client secret', AdminErrorCode.INVALID_REQUEST);
+            }
+
+            const clientId = oauth.clientId;
+            const clientSecret = oauth.clientSecret;
+
+            let provider = '';
+            switch (authType) {
+              case ServerAuthType.GoogleAuth:
+                provider = 'google';
+                break;
+              case ServerAuthType.NotionAuth:
+                provider = 'notion';
+                break;
+              case ServerAuthType.FigmaAuth:
+                provider = 'figma';
+                break;
+              default:
+                throw new AdminError('Invalid OAuth provider', AdminErrorCode.INVALID_REQUEST);
+            }
+            
+            try {
+              const exchangeResult = await exchangeAuthorizationCode({
+                provider: provider,
+                tokenUrl: oauthConfig.tokenUrl,
+                clientId: clientId,
+                clientSecret: clientSecret,
+                code: oauth.code,
+                redirectUri: oauth.redirectUri
+              });
+
+              if (exchangeResult.accessToken && exchangeResult.refreshToken) {
+                const expiresAt = exchangeResult.expiresAt ?? (Date.now() + 30 * 24 * 60 * 60 * 1000);
+                decryptedLaunchConfigValue.oauth = {
+                  clientId: clientId,
+                  clientSecret: clientSecret,
+                  accessToken: exchangeResult.accessToken,
+                  refreshToken: exchangeResult.refreshToken,
+                  expiresAt: expiresAt
+                };
+                const encryptedData = await CryptoService.encryptData(JSON.stringify(decryptedLaunchConfigValue), token);
+                launchConfigStr = JSON.stringify(encryptedData);
+              } else {
+                throw new AdminError('Failed to exchange OAuth code', AdminErrorCode.INVALID_REQUEST);
+              }
+            } catch (error) {
+              this.logger.error({ err: error }, 'Error exchanging authorization code');
+              throw new AdminError('Failed to exchange OAuth code', AdminErrorCode.INVALID_REQUEST);
+            }
+          }
+        } else {
+          throw new AdminError('Invalid OAuth code', AdminErrorCode.INVALID_REQUEST);
+        }
+      }
+    }
+
     const server = await ServerRepository.create({
       serverId,
       serverName: serverName ?? '',
       enabled: enabled ?? true,
-      launchConfig: launchConfig,
+      launchConfig: launchConfigStr,
       capabilities: JSON.stringify({tools: {}, resources: {}, prompts: {}}),
       createdAt: createdAt ?? Math.floor(Date.now() / 1000),
       updatedAt: updatedAt ?? Math.floor(Date.now() / 1000),
