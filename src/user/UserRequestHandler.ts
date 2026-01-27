@@ -26,6 +26,8 @@ import {
   UnconfigureServerRequest,
   UnconfigureServerResponseData
 } from './types.js';
+import { AuthUtils } from '../utils/AuthUtils.js';
+import { exchangeAuthorizationCode } from '../mcp/oauth/exchange.js';
 
 export class UserRequestHandler {
   private logger = createLogger('UserRequestHandler');
@@ -229,7 +231,79 @@ export class UserRequestHandler {
         if (authConf === undefined || authConf === null || authConf.length === 0) {
           throw new UserError(`authConf is required and cannot be empty`, UserErrorCode.SERVER_CONFIG_INVALID);
         }
-        launchConfig = this.assembleLaunchConfig(server.configTemplate, authConf);
+        // 1. Parse configTemplate
+        let template: Record<string, any>;
+        try {
+          template = JSON.parse(server.configTemplate);
+        } catch (error: any) {
+          throw new UserError(
+            `Invalid configTemplate JSON: ${error.message}`,
+            UserErrorCode.SERVER_CONFIG_INVALID
+          );
+        }
+
+        const oauthConfig = template.oAuthConfig;
+        if (oauthConfig && oauthConfig.deskClientId) {
+          const key = process.env.JWT_SECRET ?? 'oauth-jwt-secret';
+          const decryptedLaunchConfig = await CryptoService.decryptDataFromString(server.launchConfig, key);
+          const decryptedLaunchConfigValue = JSON.parse(decryptedLaunchConfig);
+          const oauth = decryptedLaunchConfigValue.oauth;
+          // 将 authConf 转换为 Record<string, any> key-value pairs key 是 item.key，value 是 item.value 和 item.dataType
+          const authConfValue: Record<string, any> = authConf.reduce((acc: Record<string, any>, item: any) => {
+            acc[item.key] = { value: item.value, dataType: item.dataType };
+            return acc;
+          }, {});
+          if (typeof authConfValue.code !== 'string' || authConfValue.code === '') {
+            throw new UserError(`code is required and cannot be empty`, UserErrorCode.SERVER_CONFIG_INVALID);
+          }
+          if (typeof authConfValue.redirectUri !== 'string' || authConfValue.redirectUri === '') {
+            throw new UserError(`redirectUri is required and cannot be empty`, UserErrorCode.SERVER_CONFIG_INVALID);
+          }
+          delete oauth.code;
+          delete oauth.redirectUri;
+
+          if (oauth.clientId === oauthConfig.userClientId) {
+            // user peta client id
+            // TODO: Implement this
+            throw new UserError(`User peta client id`, UserErrorCode.SERVER_CONFIG_INVALID);
+          } else {
+            // Use the client ID provided by the owner
+            const provider = AuthUtils.getOAuthProvider(server.authType);
+            if (!provider) {
+              throw new UserError('Invalid OAuth provider', UserErrorCode.SERVER_CONFIG_INVALID);
+            }
+
+            try {
+              const exchangeResult = await exchangeAuthorizationCode({
+                provider: provider,
+                tokenUrl: oauthConfig.tokenUrl,
+                clientId: oauth.clientId,
+                clientSecret: oauth.clientSecret,
+                code: authConfValue.code,
+                redirectUri: authConfValue.redirectUri
+              });
+
+              if (exchangeResult.accessToken && exchangeResult.refreshToken) {
+                const expiresAt = exchangeResult.expiresAt ?? (Date.now() + 30 * 24 * 60 * 60 * 1000);
+                decryptedLaunchConfigValue.oauth = {
+                  clientId: oauth.clientId,
+                  clientSecret: oauth.clientSecret,
+                  accessToken: exchangeResult.accessToken,
+                  refreshToken: exchangeResult.refreshToken,
+                  expiresAt: expiresAt
+                };
+                launchConfig = decryptedLaunchConfigValue;
+              } else {
+                throw new UserError('Failed to exchange OAuth code', UserErrorCode.SERVER_CONFIG_INVALID);
+              }
+            } catch (error) {
+              this.logger.error({ err: error }, 'Error exchanging authorization code');
+              throw new UserError('Failed to exchange OAuth code', UserErrorCode.SERVER_CONFIG_INVALID);
+            }
+          }
+        } else {
+          launchConfig = this.assembleLaunchConfig(template, authConf);
+        }
         break;
       case ServerCategory.CustomRemote:
         if (remoteAuth === undefined || remoteAuth === null || (remoteAuth.params.length === 0 && remoteAuth.headers.length === 0) ) {
@@ -317,25 +391,16 @@ export class UserRequestHandler {
   /**
    * Assemble launchConfig from template and user-provided credentials
    *
-   * @param configTemplate - Configuration template in JSON string format
+   * @param template - Configuration template in JSON string format
    * @param authConf - Authentication configuration provided by user
    * @returns Assembled launchConfig object
    *
    */
   private assembleLaunchConfig(
-    configTemplate: string,
+    template: Record<string, any>,
     authConf: Array<{ key: string; value: string; dataType: number }>
   ): any {
-    // 1. Parse configTemplate
-    let template: any;
-    try {
-      template = JSON.parse(configTemplate);
-    } catch (error: any) {
-      throw new UserError(
-        `Invalid configTemplate JSON: ${error.message}`,
-        UserErrorCode.SERVER_CONFIG_INVALID
-      );
-    }
+
 
     // 2. Extract mcpJsonConf
     if (!template.mcpJsonConf) {

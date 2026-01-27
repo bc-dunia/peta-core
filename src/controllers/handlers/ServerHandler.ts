@@ -164,6 +164,11 @@ export class ServerHandler {
       throw new AdminError('launchConfig must be a string and cannot be empty', AdminErrorCode.INVALID_REQUEST);
     }
 
+    const authTypeValue = authType ?? ServerAuthType.ApiKey;
+    if (typeof authTypeValue !== 'number' || !Object.values(ServerAuthType).includes(authTypeValue as ServerAuthType)) {
+      throw new AdminError('Invalid authType', AdminErrorCode.INVALID_REQUEST);
+    }
+
     // Validate consistency between allowUserInput and configTemplate
     const allowUserInputValue = allowUserInput ?? false;
 
@@ -177,76 +182,84 @@ export class ServerHandler {
     if (typeof category !== 'number' || !Object.values(ServerCategory).includes(category as ServerCategory)) {
       throw new AdminError('Invalid category', AdminErrorCode.INVALID_REQUEST);
     }
-
+    let configTemplateStr = configTemplate;
     let launchConfigStr = launchConfig;
-    if (category === ServerCategory.Template && allowUserInputValue === false) {
+    if (category === ServerCategory.Template) {
       const configTemplateValue = JSON.parse(configTemplate || '{}');
       const oauthConfig = configTemplateValue.oAuthConfig;
-      if (oauthConfig && oauthConfig.clientId) {
+      if (oauthConfig && typeof oauthConfig.clientId === 'string' && oauthConfig.clientId.trim() !== '') {
         const decryptedLaunchConfig = await CryptoService.decryptDataFromString(launchConfig, token);
         const decryptedLaunchConfigValue = JSON.parse(decryptedLaunchConfig);
         const oauth = decryptedLaunchConfigValue.oauth;
-        if (oauth && oauth.code) {
-          if (oauth.clientId === oauthConfig.clientId) {
-            // user peta client id
-            // TODO: Implement this
-            this.logger.info('User peta client id');
-            throw new AdminError('User peta client id', AdminErrorCode.INVALID_REQUEST);
-          } else {
-            // Use the client ID provided by the user
-            if ( !oauth.clientId || oauth.clientId.trim() === '' || !oauth.clientSecret || oauth.clientSecret.trim() === '') {
-              throw new AdminError('Invalid OAuth client secret', AdminErrorCode.INVALID_REQUEST);
-            }
+        if (!oauth.clientId || oauth.clientId.trim() === '') {
+          throw new AdminError('Missing required field: clientId', AdminErrorCode.INVALID_REQUEST);
+        }
+        // owner authentication flow
+        if (allowUserInputValue === false) {
+          if (oauth && oauth.code) {
+            if (oauth.clientId === oauthConfig.clientId) {
+              // user peta client id
+              // TODO: Implement this
+              this.logger.info('User peta client id');
+              throw new AdminError('User peta client id', AdminErrorCode.INVALID_REQUEST);
+            } else {
+              // Use the client ID provided by the owner
+              if (!oauth.clientSecret || oauth.clientSecret.trim() === '') {
+                throw new AdminError('Invalid OAuth client secret', AdminErrorCode.INVALID_REQUEST);
+              }
 
-            const clientId = oauth.clientId;
-            const clientSecret = oauth.clientSecret;
+              const clientId = oauth.clientId;
+              const clientSecret = oauth.clientSecret;
 
-            let provider = '';
-            switch (authType) {
-              case ServerAuthType.GoogleAuth:
-                provider = 'google';
-                break;
-              case ServerAuthType.NotionAuth:
-                provider = 'notion';
-                break;
-              case ServerAuthType.FigmaAuth:
-                provider = 'figma';
-                break;
-              default:
+              const provider = AuthUtils.getOAuthProvider(authType);
+              if (!provider) {
                 throw new AdminError('Invalid OAuth provider', AdminErrorCode.INVALID_REQUEST);
-            }
-            
-            try {
-              const exchangeResult = await exchangeAuthorizationCode({
-                provider: provider,
-                tokenUrl: oauthConfig.tokenUrl,
-                clientId: clientId,
-                clientSecret: clientSecret,
-                code: oauth.code,
-                redirectUri: oauth.redirectUri
-              });
+              }
 
-              if (exchangeResult.accessToken && exchangeResult.refreshToken) {
-                const expiresAt = exchangeResult.expiresAt ?? (Date.now() + 30 * 24 * 60 * 60 * 1000);
-                decryptedLaunchConfigValue.oauth = {
+              try {
+                const exchangeResult = await exchangeAuthorizationCode({
+                  provider: provider,
+                  tokenUrl: oauthConfig.tokenUrl,
                   clientId: clientId,
                   clientSecret: clientSecret,
-                  accessToken: exchangeResult.accessToken,
-                  refreshToken: exchangeResult.refreshToken,
-                  expiresAt: expiresAt
-                };
-                const encryptedData = await CryptoService.encryptData(JSON.stringify(decryptedLaunchConfigValue), token);
-                launchConfigStr = JSON.stringify(encryptedData);
-              } else {
+                  code: oauth.code,
+                  redirectUri: oauth.redirectUri
+                });
+
+                if (exchangeResult.accessToken && exchangeResult.refreshToken) {
+                  const expiresAt = exchangeResult.expiresAt ?? (Date.now() + 30 * 24 * 60 * 60 * 1000);
+                  decryptedLaunchConfigValue.oauth = {
+                    clientId: clientId,
+                    clientSecret: clientSecret,
+                    accessToken: exchangeResult.accessToken,
+                    refreshToken: exchangeResult.refreshToken,
+                    expiresAt: expiresAt
+                  };
+                  const encryptedData = await CryptoService.encryptData(JSON.stringify(decryptedLaunchConfigValue), token);
+                  launchConfigStr = JSON.stringify(encryptedData);
+                } else {
+                  throw new AdminError('Failed to exchange OAuth code', AdminErrorCode.INVALID_REQUEST);
+                }
+              } catch (error) {
+                this.logger.error({ err: error }, 'Error exchanging authorization code');
                 throw new AdminError('Failed to exchange OAuth code', AdminErrorCode.INVALID_REQUEST);
               }
-            } catch (error) {
-              this.logger.error({ err: error }, 'Error exchanging authorization code');
-              throw new AdminError('Failed to exchange OAuth code', AdminErrorCode.INVALID_REQUEST);
             }
+          } else {
+            throw new AdminError('Invalid OAuth code', AdminErrorCode.INVALID_REQUEST);
           }
         } else {
-          throw new AdminError('Invalid OAuth code', AdminErrorCode.INVALID_REQUEST);
+          if (oauth.clientId !== oauthConfig.userClientId) {
+            // Use the client ID provided by the owner
+            if (!oauth.clientSecret || oauth.clientSecret.trim() === '') {
+              throw new AdminError('Invalid OAuth client secret', AdminErrorCode.INVALID_REQUEST);
+            }
+          }
+          const key = process.env.JWT_SECRET ?? 'oauth-jwt-secret';
+          const encryptedData = await CryptoService.encryptData(decryptedLaunchConfig, key);
+          launchConfigStr = JSON.stringify(encryptedData);
+          configTemplateValue.oAuthConfig.deskClientId = oauth.userClientId;
+          configTemplateStr = JSON.stringify(configTemplateValue);
         }
       }
     }
@@ -262,8 +275,8 @@ export class ServerHandler {
       allowUserInput: allowUserInputValue,
       proxyId: proxyId ?? 0,
       toolTmplId: toolTmplId ?? null,
-      authType: authType ?? ServerAuthType.ApiKey,
-      configTemplate: configTemplate || '{}',
+      authType: authTypeValue,
+      configTemplate: configTemplateStr,
       category: category,
       lazyStartEnabled: lazyStartEnabled,
       publicAccess: publicAccess ?? false
