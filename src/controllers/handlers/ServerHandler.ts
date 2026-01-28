@@ -170,7 +170,10 @@ export class ServerHandler {
     }
 
     // Validate consistency between allowUserInput and configTemplate
-    const allowUserInputValue = allowUserInput ?? false;
+    const allowUserInputValue: boolean = allowUserInput ?? false;
+    if (typeof allowUserInputValue !== 'boolean') {
+      throw new AdminError('Invalid allowUserInput', AdminErrorCode.INVALID_REQUEST);
+    }
 
     if (!configTemplate || configTemplate.trim() === '' || configTemplate.trim() === '{}') {
       throw new AdminError(
@@ -182,6 +185,7 @@ export class ServerHandler {
     if (typeof category !== 'number' || !Object.values(ServerCategory).includes(category as ServerCategory)) {
       throw new AdminError('Invalid category', AdminErrorCode.INVALID_REQUEST);
     }
+    let usePetaOauthConfigValue = true;
     let configTemplateStr = configTemplate;
     let launchConfigStr = launchConfig;
     if (category === ServerCategory.Template) {
@@ -198,11 +202,16 @@ export class ServerHandler {
         if (allowUserInputValue === false) {
           if (oauth && oauth.code) {
             if (oauth.clientId === oauthConfig.clientId) {
+              usePetaOauthConfigValue = true;
               // user peta client id
+              const keyLength = Math.ceil(token.length * 0.5);
+              const key = token.substring(keyLength) + serverId + allowUserInputValue.toString();
+              const hashKey = await CryptoService.hash(key);
               // TODO: Implement this
               this.logger.info('User peta client id');
               throw new AdminError('User peta client id', AdminErrorCode.INVALID_REQUEST);
             } else {
+              usePetaOauthConfigValue = false;
               // Use the client ID provided by the owner
               if (!oauth.clientSecret || oauth.clientSecret.trim() === '') {
                 throw new AdminError('Invalid OAuth client secret', AdminErrorCode.INVALID_REQUEST);
@@ -250,6 +259,7 @@ export class ServerHandler {
           }
         } else {
           if (oauth.clientId !== oauthConfig.userClientId) {
+            usePetaOauthConfigValue = false;
             // Use the client ID provided by the owner
             if (!oauth.clientSecret || oauth.clientSecret.trim() === '') {
               throw new AdminError('Invalid OAuth client secret', AdminErrorCode.INVALID_REQUEST);
@@ -279,7 +289,8 @@ export class ServerHandler {
       configTemplate: configTemplateStr,
       category: category,
       lazyStartEnabled: lazyStartEnabled,
-      publicAccess: publicAccess ?? false
+      publicAccess: publicAccess ?? false,
+      usePetaOauthConfig: usePetaOauthConfigValue
     });
 
     // Log admin operation
@@ -313,7 +324,8 @@ export class ServerHandler {
       authType: true,
       category: true,
       lazyStartEnabled: true,
-      publicAccess: true
+      publicAccess: true,
+      usePetaOauthConfig: true
     };
 
     // Exact query for specific server

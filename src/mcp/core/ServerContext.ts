@@ -510,6 +510,14 @@ export class ServerContext {
    */
   private async updateRefreshTokenToDatabase(oauthConfig: any): Promise<void> {
     try {
+      const usePetaOauthConfig = this.serverEntity.usePetaOauthConfig;
+      if (usePetaOauthConfig) {
+        this.logger.debug({
+          serverName: this.serverEntity.serverName
+        }, 'Skipping OAuth config persistence for Peta-managed OAuth');
+        return;
+      }
+
       // 1. Both missing → return (cannot update)
       if (!this.userId && !this.userToken) {
         this.logger.debug({

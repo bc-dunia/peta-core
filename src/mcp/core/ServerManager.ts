@@ -7,6 +7,7 @@ import { ServerAuthType, ServerCategory, ServerStatus } from '../../types/enums.
 import { Permissions, ServerConfigCapabilities } from '../types/mcp.js';
 import { CryptoService } from '../../security/CryptoService.js';
 import { AuthStrategyFactory } from '../auth/AuthStrategyFactory.js';
+import { PetaAuthStrategy } from '../auth/PetaAuthStrategy.js';
 import { AuthError, AuthErrorType } from '../../types/auth.types.js';
 import { McpServerCapabilities } from '../types/mcp.js';
 import { GlobalRequestRouter } from './GlobalRequestRouter.js';
@@ -298,6 +299,32 @@ export class ServerManager {
     // // Only applicable for stdio type
     // return server.transportType === 'stdio';
     return true;
+  }
+
+  private injectOAuthTokenEnv(
+    authType: ServerAuthType,
+    launchConfig: Record<string, any>,
+    accessToken: string
+  ): void {
+    switch (authType) {
+      case ServerAuthType.GoogleAuth:
+      case ServerAuthType.FigmaAuth:
+        launchConfig.env = {
+          ...launchConfig.env,
+          accessToken: accessToken,
+        };
+        break;
+
+      case ServerAuthType.NotionAuth:
+        launchConfig.env = {
+          ...launchConfig.env,
+          notionToken: accessToken,
+        };
+        break;
+
+      default:
+        break;
+    }
   }
 
   /**
@@ -698,7 +725,7 @@ export class ServerManager {
       // 1. Parse launch_config
       const baseLaunchConfig = await this.decryptLaunchConfig(token, serverEntity);
 
-      const launchConfig = JSON.parse(baseLaunchConfig);
+      const launchConfig: Record<string, any> = JSON.parse(baseLaunchConfig);
 
       // 2. Initialize authentication (handle OAuth token)
       await this.initializeAuthentication(serverContext, launchConfig, token);
@@ -986,10 +1013,25 @@ export class ServerManager {
    */
   private async initializeAuthentication(
     serverContext: ServerContext,
-    launchConfig: any,
+    launchConfig: Record<string, any>,
     token: string
   ): Promise<void> {
-    switch (serverContext.serverEntity.authType) {
+    const authType = serverContext.serverEntity.authType;
+    const usePetaOauthConfig = serverContext.serverEntity.usePetaOauthConfig;
+
+    if (usePetaOauthConfig && serverContext.serverEntity.authType !== ServerAuthType.ApiKey) {
+      const initialToken = await this.initializePetaAuth(serverContext, launchConfig, token);
+      this.injectOAuthTokenEnv(authType, launchConfig, initialToken);
+      delete launchConfig.oauth;
+
+      this.logger.info({
+        serverName: serverContext.serverEntity.serverName,
+        usePetaOauthConfig
+      }, 'OAuth initialized with Peta config');
+      return;
+    }
+
+    switch (authType) {
       case ServerAuthType.GoogleAuth:
         await this.initializeGoogleAuth(serverContext, launchConfig);
         break;
@@ -1008,15 +1050,6 @@ export class ServerManager {
         // API Key doesn't need special handling, just pass through
         break;
 
-      // Reserved extension point: can add other OAuth providers in the future
-      // case ServerAuthType.GitHubAuth:
-      //   await this.initializeGitHubAuth(serverContext, launchConfig);
-      //   break;
-
-      // case ServerAuthType.MicrosoftAuth:
-      //   await this.initializeMicrosoftAuth(serverContext, launchConfig);
-      //   break;
-
       default:
         this.logger.warn(
           { authType: serverContext.serverEntity.authType, serverName: serverContext.serverEntity.serverName },
@@ -1030,7 +1063,7 @@ export class ServerManager {
    */
   private async initializeGoogleAuth(
     serverContext: ServerContext,
-    launchConfig: any
+    launchConfig: Record<string, any>
   ): Promise<void> {
     // 1. Verify OAuth configuration exists
     if (
@@ -1075,7 +1108,7 @@ export class ServerManager {
    */
   private async initializeNotionAuth(
     serverContext: ServerContext,
-    launchConfig: any
+    launchConfig: Record<string, any>
   ): Promise<void> {
     // 1. Verify OAuth configuration exists
     if (
@@ -1120,7 +1153,7 @@ export class ServerManager {
    */
   private async initializeFigmaAuth(
     serverContext: ServerContext,
-    launchConfig: any
+    launchConfig: Record<string, any>
   ): Promise<void> {
     // 1. Verify OAuth configuration exists
     if (
@@ -1158,6 +1191,28 @@ export class ServerManager {
     delete launchConfig.oauth;
 
     this.logger.info({ serverName: serverContext.serverEntity.serverName }, 'Figma OAuth initialized');
+  }
+
+  private async initializePetaAuth(
+    serverContext: ServerContext,
+    launchConfig: Record<string, any>,
+    token: string
+  ): Promise<string> {
+    if (!launchConfig.oauth?.clientId) {
+      throw new Error(
+        `[ServerManager] Missing OAuth configuration for server ${serverContext.serverID}. Required: clientId`
+      );
+    }
+
+    const authStrategy = new PetaAuthStrategy({
+      userToken: token,
+      server: serverContext.serverEntity,
+      clientId: launchConfig.oauth.clientId,
+      accessToken: launchConfig.oauth.accessToken,
+      expiresAt: launchConfig.oauth.expiresAt
+    });
+
+    return await serverContext.startTokenRefresh(authStrategy);
   }
 
   /**

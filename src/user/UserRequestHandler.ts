@@ -264,6 +264,9 @@ export class UserRequestHandler {
 
           if (oauth.clientId === oauthConfig.userClientId) {
             // user peta client id
+            const keyLength = Math.ceil(userToken.length * 0.5);
+              const key = userToken.substring(keyLength) + serverId + true.toString();
+              const hashKey = await CryptoService.hash(key);
             // TODO: Implement this
             throw new UserError(`User peta client id`, UserErrorCode.SERVER_CONFIG_INVALID);
           } else {
