@@ -24,6 +24,7 @@ export class AuthStrategyFactory {
   static create(authType: ServerAuthType, config: any): IAuthStrategy | null {
     switch (authType) {
       case ServerAuthType.GoogleAuth:
+      case ServerAuthType.GoogleCalendarAuth:
         return new GoogleAuthStrategy({
           clientId: config.clientId,
           clientSecret: config.clientSecret,

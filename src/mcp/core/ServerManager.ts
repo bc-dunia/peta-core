@@ -308,6 +308,7 @@ export class ServerManager {
   ): void {
     switch (authType) {
       case ServerAuthType.GoogleAuth:
+      case ServerAuthType.GoogleCalendarAuth:
       case ServerAuthType.FigmaAuth:
         launchConfig.env = {
           ...launchConfig.env,
@@ -1033,6 +1034,8 @@ export class ServerManager {
 
     switch (authType) {
       case ServerAuthType.GoogleAuth:
+      case ServerAuthType.GoogleCalendarAuth:
+        serverContext.userToken = token;
         await this.initializeGoogleAuth(serverContext, launchConfig);
         break;
 
@@ -1078,7 +1081,7 @@ export class ServerManager {
 
     // 2. Create authentication strategy
     const authStrategy = AuthStrategyFactory.create(
-      ServerAuthType.GoogleAuth,
+      serverContext.serverEntity.authType,
       launchConfig.oauth
     );
 
