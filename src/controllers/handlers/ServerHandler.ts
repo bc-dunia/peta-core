@@ -268,7 +268,7 @@ export class ServerHandler {
           const key = process.env.JWT_SECRET ?? 'oauth-jwt-secret';
           const encryptedData = await CryptoService.encryptData(decryptedLaunchConfig, key);
           launchConfigStr = JSON.stringify(encryptedData);
-          configTemplateValue.oAuthConfig.deskClientId = oauth.userClientId;
+          configTemplateValue.oAuthConfig.deskClientId = oauth.clientId;
           configTemplateStr = JSON.stringify(configTemplateValue);
         }
       }

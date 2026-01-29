@@ -253,14 +253,14 @@ export class UserRequestHandler {
             acc[item.key] = { value: item.value, dataType: item.dataType };
             return acc;
           }, {});
-          if (typeof authConfValue.code !== 'string' || authConfValue.code === '') {
+          const oauthCode = authConfValue.YOUR_OAUTH_CODE.value;
+          const oauthRedirectUrl = authConfValue.YOUR_OAUTH_REDIRECT_URL.value;
+          if (typeof oauthCode !== 'string' || oauthCode === '') {
             throw new UserError(`code is required and cannot be empty`, UserErrorCode.SERVER_CONFIG_INVALID);
           }
-          if (typeof authConfValue.redirectUri !== 'string' || authConfValue.redirectUri === '') {
+          if (typeof oauthRedirectUrl !== 'string' || oauthRedirectUrl === '') {
             throw new UserError(`redirectUri is required and cannot be empty`, UserErrorCode.SERVER_CONFIG_INVALID);
           }
-          delete oauth.code;
-          delete oauth.redirectUri;
 
           if (oauth.clientId === oauthConfig.userClientId) {
             // user peta client id
@@ -282,8 +282,8 @@ export class UserRequestHandler {
                 tokenUrl: oauthConfig.tokenUrl,
                 clientId: oauth.clientId,
                 clientSecret: oauth.clientSecret,
-                code: authConfValue.code,
-                redirectUri: authConfValue.redirectUri
+                code: oauthCode,
+                redirectUri: oauthRedirectUrl
               });
 
               if (exchangeResult.accessToken && exchangeResult.refreshToken) {
