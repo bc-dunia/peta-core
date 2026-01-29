@@ -1035,18 +1035,10 @@ export class ServerManager {
     switch (authType) {
       case ServerAuthType.GoogleAuth:
       case ServerAuthType.GoogleCalendarAuth:
-        serverContext.userToken = token;
-        await this.initializeGoogleAuth(serverContext, launchConfig);
-        break;
-
       case ServerAuthType.NotionAuth:
-        serverContext.userToken = token;
-        await this.initializeNotionAuth(serverContext, launchConfig);
-        break;
-
       case ServerAuthType.FigmaAuth:
         serverContext.userToken = token;
-        await this.initializeFigmaAuth(serverContext, launchConfig);
+        await this.initializeOAuthWithRefresh(serverContext, launchConfig);
         break;
 
       case ServerAuthType.ApiKey:
@@ -1062,9 +1054,9 @@ export class ServerManager {
   }
 
   /**
-   * Initialize Google OAuth authentication
+   * Initialize OAuth authentication that uses refresh tokens
    */
-  private async initializeGoogleAuth(
+  private async initializeOAuthWithRefresh(
     serverContext: ServerContext,
     launchConfig: Record<string, any>
   ): Promise<void> {
@@ -1095,105 +1087,15 @@ export class ServerManager {
     const initialToken = await serverContext.startTokenRefresh(authStrategy);
 
     // 4. Inject access token into environment variables (don't pass OAuth config)
-    launchConfig.env = {
-      ...launchConfig.env,
-      accessToken: initialToken,
-    };
+    this.injectOAuthTokenEnv(serverContext.serverEntity.authType, launchConfig, initialToken);
 
     // 5. Remove oauth config (don't pass to downstream server)
     delete launchConfig.oauth;
 
-    this.logger.info({ serverName: serverContext.serverEntity.serverName }, 'Google OAuth initialized');
-  }
-
-  /**
-   * Initialize Notion OAuth authentication
-   */
-  private async initializeNotionAuth(
-    serverContext: ServerContext,
-    launchConfig: Record<string, any>
-  ): Promise<void> {
-    // 1. Verify OAuth configuration exists
-    if (
-      !launchConfig.oauth?.clientId ||
-      !launchConfig.oauth?.clientSecret ||
-      !launchConfig.oauth?.refreshToken
-    ) {
-      throw new Error(
-        `[ServerManager] Missing OAuth configuration for server ${serverContext.serverID}. Required: clientId, clientSecret, refreshToken`
-      );
-    }
-
-    // 2. Create authentication strategy
-    const authStrategy = AuthStrategyFactory.create(
-      ServerAuthType.NotionAuth,
-      launchConfig.oauth
-    );
-
-    if (!authStrategy) {
-      throw new Error(
-        `[ServerManager] Failed to create auth strategy for server ${serverContext.serverID}`
-      );
-    }
-
-    // 3. Start token refresh and get initial token
-    const initialToken = await serverContext.startTokenRefresh(authStrategy);
-
-    // 4. Inject access token into environment variables (don't pass OAuth config)
-    launchConfig.env = {
-      ...launchConfig.env,
-      notionToken: initialToken,
-    };
-
-    // 5. Remove oauth config (don't pass to downstream server)
-    delete launchConfig.oauth;
-
-    this.logger.info({ serverName: serverContext.serverEntity.serverName }, 'Notion OAuth initialized');
-  }
-
-  /**
-   * Initialize Figma OAuth authentication
-   */
-  private async initializeFigmaAuth(
-    serverContext: ServerContext,
-    launchConfig: Record<string, any>
-  ): Promise<void> {
-    // 1. Verify OAuth configuration exists
-    if (
-      !launchConfig.oauth?.clientId ||
-      !launchConfig.oauth?.clientSecret ||
-      !launchConfig.oauth?.refreshToken
-    ) {
-      throw new Error(
-        `[ServerManager] Missing OAuth configuration for server ${serverContext.serverID}. Required: clientId, clientSecret, refreshToken`
-      );
-    }
-
-    // 2. Create authentication strategy
-    const authStrategy = AuthStrategyFactory.create(
-      ServerAuthType.FigmaAuth,
-      launchConfig.oauth
-    );
-
-    if (!authStrategy) {
-      throw new Error(
-        `[ServerManager] Failed to create auth strategy for server ${serverContext.serverID}`
-      );
-    }
-
-    // 3. Start token refresh and get initial token
-    const initialToken = await serverContext.startTokenRefresh(authStrategy);
-
-    // 4. Inject access token into environment variables (don't pass OAuth config)
-    launchConfig.env = {
-      ...launchConfig.env,
-      accessToken: initialToken,
-    };
-
-    // 5. Remove oauth config (don't pass to downstream server)
-    delete launchConfig.oauth;
-
-    this.logger.info({ serverName: serverContext.serverEntity.serverName }, 'Figma OAuth initialized');
+    this.logger.info({
+      serverName: serverContext.serverEntity.serverName,
+      authType: serverContext.serverEntity.authType
+    }, 'OAuth initialized');
   }
 
   private async initializePetaAuth(
