@@ -17,6 +17,7 @@ import { ProxyHandler } from './handlers/ProxyHandler.js';
 import { BackupHandler } from './handlers/BackupHandler.js';
 import { LogHandler } from './handlers/LogHandler.js';
 import { CloudflaredHandler } from './handlers/CloudflaredHandler.js';
+import { SkillsHandler } from './handlers/SkillsHandler.js';
 import { UserRole } from '../types/enums.js';
 import { createLogger } from '../logger/index.js';
 import { SocketService } from '../socket/SocketService.js';
@@ -34,6 +35,7 @@ export class ConfigController {
   private backupHandler: BackupHandler;
   private logHandler: LogHandler;
   private cloudflaredHandler: CloudflaredHandler;
+  private skillsHandler: SkillsHandler;
   
   // Logger for ConfigController
   private logger = createLogger('ConfigController');
@@ -50,6 +52,7 @@ export class ConfigController {
     this.backupHandler = new BackupHandler(ipWhitelistService!);
     this.logHandler = new LogHandler();
     this.cloudflaredHandler = new CloudflaredHandler();
+    this.skillsHandler = new SkillsHandler();
   }
 
   /**
@@ -295,6 +298,32 @@ export class ConfigController {
           break;
         case AdminActionType.STOP_CLOUDFLARED:
           result = await this.cloudflaredHandler.handleStopCloudflared(adminRequest);
+          break;
+
+        // ==================== Skills Operations (10040-10043) ====================
+        case AdminActionType.LIST_SKILLS:
+          result = await this.skillsHandler.handleListSkills(adminRequest);
+          break;
+        case AdminActionType.UPLOAD_SKILL:
+          // Only Owner role can upload skills
+          if (req.authContext?.role !== UserRole.Owner) {
+            throw new AdminError('Only Owner role can upload skills.', AdminErrorCode.FORBIDDEN);
+          }
+          result = await this.skillsHandler.handleUploadSkill(adminRequest);
+          break;
+        case AdminActionType.DELETE_SKILL:
+          // Only Owner role can delete skills
+          if (req.authContext?.role !== UserRole.Owner) {
+            throw new AdminError('Only Owner role can delete skills.', AdminErrorCode.FORBIDDEN);
+          }
+          result = await this.skillsHandler.handleDeleteSkill(adminRequest);
+          break;
+        case AdminActionType.DELETE_SERVER_SKILLS:
+          // Only Owner role can delete server skills
+          if (req.authContext?.role !== UserRole.Owner) {
+            throw new AdminError('Only Owner role can delete server skills.', AdminErrorCode.FORBIDDEN);
+          }
+          result = await this.skillsHandler.handleDeleteServerSkills(adminRequest);
           break;
 
         default:
