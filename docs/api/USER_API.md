@@ -190,10 +190,24 @@ User API permissions are simple and straightforward:
 - Each key is a `serverId`
 - `enabled`: Whether user has access to this server
 - `serverName`: Human-readable server name
+- `allowUserInput`: Whether this server supports user-provided configuration
+- `authType`: Authentication type (see ServerAuthType enum)
+- `category`: Server category (Template / CustomRemote / RestApi)
+- `configTemplate`: Configuration template as JSON string (Template/CustomRemote/RestApi); includes `credentials` and optionally `oAuthConfig` for Template servers
+- `configured`: Whether this server has been configured by the user (for allowUserInput servers)
+- `status`: Current server status (enum number):
+  - `0` = Online
+  - `1` = Offline
+  - `2` = Connecting
+  - `3` = Error
+  - `4` = Sleeping
 - `tools`: Object mapping tool names to their configuration
   - `enabled`: Whether user can use this tool
   - `description`: Tool description
-  - `dangerLevel`: Risk level (0=safe, 1=caution, 2=danger)
+  - `dangerLevel`: Execution requirement level
+    - `0` = Silent (auto execute)
+    - `1` = Notification (auto execute with notice)
+    - `2` = Approval (manual approval required)
 - `resources`: Object mapping resource URIs to their configuration
 - `prompts`: Object mapping prompt names to their configuration
 
@@ -229,6 +243,33 @@ User API permissions are simple and straightforward:
 
 *User can submit partial configuration - only provided fields will be validated and saved*
 
+**Input Schema (effective fields)**:
+```typescript
+type SetCapabilitiesInput = {
+  [serverId: string]: {
+    enabled?: boolean;
+    tools?: {
+      [toolName: string]: {
+        enabled?: boolean;
+        dangerLevel?: 0 | 1 | 2; // Silent | Notification | Approval
+      };
+    };
+    resources?: {
+      [resourceName: string]: { enabled?: boolean };
+    };
+    prompts?: {
+      [promptName: string]: { enabled?: boolean };
+    };
+  };
+};
+```
+
+**Important Behavior Notes**:
+- Only `enabled` fields (and `tools.*.dangerLevel`) are persisted; other fields are ignored.
+- Non-existent servers/tools/resources/prompts are ignored (no error).
+- Invalid `dangerLevel` values are ignored.
+- If `data` is missing or not an object, the request may fail with server error.
+
 **Return Result** (data):
 ```json
 {
@@ -251,9 +292,10 @@ User API permissions are simple and straightforward:
 - Can only disable capabilities, not add new ones
 - Changes take effect immediately for all user's active sessions
 - User preferences are merged with admin permissions (admin takes precedence)
+ - `dangerLevel` updates apply only to tools that exist in current capabilities
 
 **Error Cases**:
-- `INVALID_CAPABILITIES (3001)`: Malformed capability data structure
+- `INVALID_CAPABILITIES (3001)`: Reserved for malformed capability data (current implementation may return `INTERNAL_ERROR` if `data` is not a valid object)
 
 ---
 
@@ -269,6 +311,7 @@ User API permissions are simple and straightforward:
 - **RestApi (3)**: RESTful API servers with standardized authentication methods
 
 **Important**: Only one authentication parameter should be provided based on the server's category. Providing the wrong auth parameter will result in `SERVER_CONFIG_INVALID` error.
+**Tip**: Call `GET_CAPABILITIES` first to read `category`, `authType`, and `configTemplate` (including `credentials` and `oAuthConfig`) before constructing this request.
 
 **Request Parameters** (data):
 
@@ -278,10 +321,21 @@ User API permissions are simple and straightforward:
   "serverId": "notion",
   "authConf": [
     {
-      "key": "{{NOTION_API_KEY}}",
+      "key": "YOUR_API_KEY",
       "value": "secret_ntn_123456789abcdef",
       "dataType": 1
     }
+  ]
+}
+```
+
+*Example 1b: Template OAuth Server (category=1, OAuth flow)*
+```json
+{
+  "serverId": "notion",
+  "authConf": [
+    { "key": "YOUR_OAUTH_CODE", "value": "authorization_code", "dataType": 1 },
+    { "key": "YOUR_OAUTH_REDIRECT_URL", "value": "https://your.app/callback", "dataType": 1 }
   ]
 }
 ```
@@ -357,9 +411,28 @@ User API permissions are simple and straightforward:
 
 **For Template Servers (category=1)**:
 - `authConf` (array, required for Template): Authentication configuration array
-  - `key` (string): Placeholder key from configTemplate (e.g., `{{API_KEY}}`, `{{NOTION_API_KEY}}`)
+  - `key` (string): Placeholder key from `template.credentials` (must match the placeholder in `template.mcpJsonConf`)
   - `value` (string): Actual credential value to substitute into placeholder
   - `dataType` (number): Data type identifier (currently only `1` = string replacement is supported)
+  - **Source of authConf**: `server.configTemplate` is a JSON string. After parsing, `template.credentials` is an array:
+    ```json
+    [
+      { "name": "ApiKey", "description": "...", "dataType": 1, "key": "YOUR_API_KEY", "value": "" }
+    ]
+    ```
+    Client should submit `authConf` by copying `key` and `dataType` from `credentials`, and filling only `value`.
+  - **How to decide input vs OAuth**:
+    - `server.authType === 1 (ApiKey)` → user should input values for credentials (standard Template flow).
+    - `server.authType > 1` → OAuth flow (see below). In practice, OAuth templates will include `template.oAuthConfig.deskClientId`.
+    - `ServerAuthType` reference: `1=ApiKey`, `2=GoogleAuth`, `3=NotionAuth`, `4=FigmaAuth`, `5=GoogleCalendarAuth`, `6=GithubAuth`, `7=StripeAuth`, `8=ZendeskAuth`, `9=CanvasAuth`.
+
+  - **OAuth Template servers**:
+    - If `template.oAuthConfig.deskClientId` exists, the server uses OAuth authorization flow.
+    - Client should use `deskClientId` to initiate authorization, then submit the **code** and **redirect URL** via `authConf`.
+    - Only these two keys are used by backend:
+      - `YOUR_OAUTH_CODE`
+      - `YOUR_OAUTH_REDIRECT_URL`
+    - Other credential items (e.g., `YOUR_CLIENT_ID`, `YOUR_CLIENT_SECRET`) may exist in `template.credentials` for schema consistency, but **are ignored** in user configuration.
 
 **For CustomRemote Servers (category=2)**:
 - `remoteAuth` (object, required for CustomRemote): Remote server authentication configuration
@@ -382,6 +455,8 @@ User API permissions are simple and straightforward:
   - `param` (string, conditional): Query parameter name - required for `query_param` type
   - `username` (string, conditional): Username - required for `basic` type
   - `password` (string, conditional): Password - required for `basic` type
+  - **Implementation detail**: The backend forwards `restfulApiAuth` as-is into the REST gateway config. Client must ensure structure is correct.
+  - **ConfigTemplate requirement**: RestApi servers must have a `configTemplate` with `apis[0].auth` (the backend injects `restfulApiAuth` into that field).
 
 **Return Result** (data):
 ```json
@@ -404,6 +479,9 @@ User API permissions are simple and straightforward:
    - Parse server's `configTemplate` JSON
    - Extract `mcpJsonConf` from template
    - Replace placeholders with user-provided credentials
+   - If `template.oAuthConfig.deskClientId` exists, skip placeholder replacement and:
+     - Read `YOUR_OAUTH_CODE` and `YOUR_OAUTH_REDIRECT_URL` from `authConf`
+     - Exchange authorization code for tokens
    - Handle OAuth expiration dates dynamically (Notion: 30 days, Figma: 90 days)
 
    **For CustomRemote Servers (category=2)**:
