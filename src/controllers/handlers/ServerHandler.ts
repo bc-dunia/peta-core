@@ -40,6 +40,17 @@ export class ServerHandler {
     serverEntity = await ServerRepository.update(targetId, { enabled: true });
 
     if (serverEntity.allowUserInput === true) {
+      const servers = ServerManager.instance.getTemporaryServers(targetId);
+      for (const server of servers) {
+        server.serverEntity = serverEntity;
+      }
+      // Notify related users of server capability changes
+      const changed = {
+        toolsChanged: true,
+        resourcesChanged: true,
+        promptsChanged: true,
+      }
+      this.notifyUsersOfServerChange(targetId, SessionStore.instance.getSessionsUsingServer(targetId), 'server_started', changed);
       return null;
     }
 
