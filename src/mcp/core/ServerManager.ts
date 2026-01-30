@@ -999,9 +999,9 @@ export class ServerManager {
                 await UserRepository.updateUserPreferences(serverContext.userId, userPreferences);
               }
             }
-          } else {
-            await ServerRepository.updateCapabilities(serverContext.serverID, JSON.stringify({tools: newCapabilities.tools, resources: newCapabilities.resources, prompts: newCapabilities.prompts}));
           }
+          
+          await ServerRepository.updateCapabilities(serverContext.serverID, JSON.stringify({tools: newCapabilities.tools, resources: newCapabilities.resources, prompts: newCapabilities.prompts}));
         }
       }
     } catch (error) {
