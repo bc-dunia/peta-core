@@ -96,7 +96,9 @@ export class ConfigController {
         AdminActionType.CREATE_PROXY,
         AdminActionType.CREATE_USER,
         AdminActionType.GET_OWNER,
-        AdminActionType.RESTORE_DATABASE].includes(adminRequest.action)) {
+        AdminActionType.RESTORE_DATABASE,
+        AdminActionType.COUNT_USERS,
+        AdminActionType.COUNT_SERVERS].includes(adminRequest.action)) {
         if (!token) {
           throw new AdminError('Token is required', AdminErrorCode.FORBIDDEN);
         }
