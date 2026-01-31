@@ -1,34 +1,33 @@
 /**
- * GitHub OAuth Provider Adapter
+ * GitHub App OAuth Provider Adapter (user access tokens)
  *
  * Token URL: https://github.com/login/oauth/access_token
  * Auth Method: Form params (client_id/client_secret in body)
  * Content-Type: application/x-www-form-urlencoded
  * Accept: application/json (required to get JSON response)
- * Returns expires_in: No (classic tokens don't expire)
- * Default expiry: 180 days (15552000 seconds) - conservative estimate
- *
- * Note: GitHub's fine-grained personal access tokens can have expiration,
- * but OAuth app tokens typically don't expire unless revoked.
+ * Returns expires_in: Yes (default 8 hours when token expiration is enabled)
+ * Returns refresh_token: Yes (when user-to-server token expiration is enabled)
  */
 
 import type { ExchangeContext, ProviderAdapter, ProviderRequest } from '../types.js';
 
-const ONE_HUNDRED_EIGHTY_DAYS_SECONDS = 180 * 24 * 60 * 60; // 15552000
+const EIGHT_HOURS_SECONDS = 8 * 60 * 60; // 28800
 
 export const githubAdapter: ProviderAdapter = {
   name: 'github',
   tokenUrl: 'https://github.com/login/oauth/access_token',
-  defaultExpiresIn: ONE_HUNDRED_EIGHTY_DAYS_SECONDS,
+  defaultExpiresIn: EIGHT_HOURS_SECONDS,
 
   buildRequest(ctx: ExchangeContext): ProviderRequest {
     const params = new URLSearchParams({
-      grant_type: 'authorization_code',
       client_id: ctx.clientId,
       client_secret: ctx.clientSecret,
       code: ctx.code,
       redirect_uri: ctx.redirectUri,
     });
+    if (ctx.codeVerifier) {
+      params.set('code_verifier', ctx.codeVerifier);
+    }
 
     return {
       headers: {

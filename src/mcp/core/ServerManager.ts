@@ -310,6 +310,7 @@ export class ServerManager {
       case ServerAuthType.GoogleAuth:
       case ServerAuthType.GoogleCalendarAuth:
       case ServerAuthType.FigmaAuth:
+      case ServerAuthType.GithubAuth:
         launchConfig.env = {
           ...launchConfig.env,
           accessToken: accessToken,
@@ -1037,6 +1038,7 @@ export class ServerManager {
       case ServerAuthType.GoogleCalendarAuth:
       case ServerAuthType.NotionAuth:
       case ServerAuthType.FigmaAuth:
+      case ServerAuthType.GithubAuth:
         serverContext.userToken = token;
         await this.initializeOAuthWithRefresh(serverContext, launchConfig);
         break;
