@@ -171,8 +171,18 @@ function executeWithSpinner(command, args, spinnerText, successMessage, options 
         resolve({ stdout, stderr, code });
       } else {
         logError(successMessage.replace('successfully', 'failed').replace('built', 'build failed'));
-        if (stderr) {
-          console.error(chalk.red(stderr));
+        const hasStdout = stdout && stdout.trim().length > 0;
+        const hasStderr = stderr && stderr.trim().length > 0;
+        if (hasStdout) {
+          console.error(chalk.yellow('--- Command stdout ---'));
+          console.error(stdout.trimEnd());
+        }
+        if (hasStderr) {
+          console.error(chalk.red('--- Command stderr ---'));
+          console.error(stderr.trimEnd());
+        }
+        if (!hasStdout && !hasStderr) {
+          console.error(chalk.yellow('No output captured from failed command.'));
         }
         reject(new Error(`Command failed with exit code ${code}`));
       }

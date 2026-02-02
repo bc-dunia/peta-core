@@ -272,7 +272,7 @@ export class GlobalRequestRouter {
       proxyRequestId: proxyContext.proxyRequestId,
       parentUniformRequestId: proxyContext.uniformRequestId,
       method: 'elicit/input',
-      requestedSchema: request.params.requestedSchema
+      requestedSchema: request.params
     }, 'Handling elicitation request from server');
 
     // Get ProxySession through sessionId

@@ -1581,7 +1581,7 @@ export class ProxySession {
    */
   public async forwardElicitationToClient(request: ElicitRequest, options?: RequestOptions): Promise<ElicitResult> {
     this.logger.debug({ relatedRequestId: options?.relatedRequestId,
-      requestedSchema: request.params.requestedSchema
+      requestedSchema: request.params
     });
 
     // Handle relatedRequestId mapping
