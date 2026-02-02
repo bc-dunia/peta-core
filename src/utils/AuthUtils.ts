@@ -235,8 +235,6 @@ export class AuthUtils {
         return 'github';
       case ServerAuthType.CanvasAuth:
         return 'canvas';
-      case ServerAuthType.StripeAuth:
-        return 'stripe';
       case ServerAuthType.ZendeskAuth:
         return 'zendesk';
       case ServerAuthType.ApiKey:

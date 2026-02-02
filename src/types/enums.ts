@@ -30,9 +30,8 @@ export enum ServerAuthType {
   FigmaAuth = 4,   // Figma OAuth authentication
   GoogleCalendarAuth = 5,   // Google Calendar OAuth authentication
   GithubAuth = 6,   // Github OAuth authentication
-  StripeAuth = 7,   // Stripe OAuth authentication
-  ZendeskAuth = 8,   // Zendesk OAuth authentication
-  CanvasAuth = 9,   // Canvas OAuth authentication
+  ZendeskAuth = 7,   // Zendesk OAuth authentication
+  CanvasAuth = 8,   // Canvas OAuth authentication
 }
 
 export enum MCPEventLogType {
