@@ -334,9 +334,10 @@ export async function startApplication() {
     // ==================== General middleware ====================
 
     // Body parser middleware - must be before middleware that needs to access req.body
-    app.use(express.json());
+    // Increased limit for Skills ZIP file uploads (max 10MB + JSON overhead)
+    app.use(express.json({ limit: '15mb' }));
     // Add URL-encoded form parsing (required for OAuth)
-    app.use(express.urlencoded({ extended: true }));
+    app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
     // Commented out in production, can be enabled in development for debugging
     app.use((req, res, next) => {
