@@ -209,6 +209,12 @@ export class ServerHandler {
         if (!oauth.clientId || oauth.clientId.trim() === '') {
           throw new AdminError('Missing required field: clientId', AdminErrorCode.INVALID_REQUEST);
         }
+
+        const provider = AuthUtils.getOAuthProvider(authType);
+        if (!provider) {
+          throw new AdminError('Invalid OAuth provider', AdminErrorCode.INVALID_REQUEST);
+        }
+
         // owner authentication flow
         if (allowUserInputValue === false) {
           if (oauth && oauth.code) {
@@ -218,9 +224,56 @@ export class ServerHandler {
               const keyLength = Math.ceil(token.length * 0.5);
               const key = token.substring(keyLength) + serverId + allowUserInputValue.toString();
               const hashKey = await CryptoService.hash(key);
+
+              // The following is a temporary processing process. This will not be the final solution. It is only for testing.
+              // ===================================================
+              const clientSecrets = process.env.PE_CLIENT_SECRETS;
+              if (!clientSecrets) {
+                throw new AdminError('PE_CLIENT_SECRETS is not set', AdminErrorCode.INVALID_REQUEST);
+              }
+              const clientSecretsMap = JSON.parse(clientSecrets);
+              if (!clientSecretsMap[oauth.clientId]) {
+                throw new AdminError('Invalid client id', AdminErrorCode.INVALID_REQUEST);
+              }
+              const values = clientSecretsMap[oauth.clientId];
+              const clientSecret = values?.clientSecret;
+
+              if (!clientSecret) {
+                throw new AdminError('Invalid client secret', AdminErrorCode.INVALID_REQUEST);
+              }
+              
+              try {
+                const exchangeResult = await exchangeAuthorizationCode({
+                  provider: provider,
+                  tokenUrl: oauthConfig.tokenUrl,
+                  clientId: oauth.clientId,
+                  clientSecret: clientSecret,
+                  code: oauth.code,
+                  redirectUri: oauth.redirectUri
+                });
+
+                if (exchangeResult.accessToken && exchangeResult.refreshToken) {
+                  const expiresAt = exchangeResult.expiresAt ?? (Date.now() + 30 * 24 * 60 * 60 * 1000);
+                  decryptedLaunchConfigValue.oauth = {
+                    clientId: oauth.clientId,
+                    clientSecret: clientSecret,
+                    accessToken: exchangeResult.accessToken,
+                    refreshToken: exchangeResult.refreshToken,
+                    expiresAt: expiresAt
+                  };
+                  const encryptedData = await CryptoService.encryptData(JSON.stringify(decryptedLaunchConfigValue), token);
+                  launchConfigStr = JSON.stringify(encryptedData);
+                } else {
+                  throw new AdminError('Failed to exchange OAuth code', AdminErrorCode.INVALID_REQUEST);
+                }
+              } catch (error) {
+                this.logger.error({ err: error }, 'Error exchanging authorization code');
+                throw new AdminError('Failed to exchange OAuth code', AdminErrorCode.INVALID_REQUEST);
+              }
+              // ===================================================
               // TODO: Implement this
               this.logger.info('User peta client id');
-              throw new AdminError('User peta client id', AdminErrorCode.INVALID_REQUEST);
+              // throw new AdminError('User peta client id', AdminErrorCode.INVALID_REQUEST);
             } else {
               usePetaOauthConfigValue = false;
               // Use the client ID provided by the owner
@@ -230,11 +283,6 @@ export class ServerHandler {
 
               const clientId = oauth.clientId;
               const clientSecret = oauth.clientSecret;
-
-              const provider = AuthUtils.getOAuthProvider(authType);
-              if (!provider) {
-                throw new AdminError('Invalid OAuth provider', AdminErrorCode.INVALID_REQUEST);
-              }
 
               try {
                 const exchangeResult = await exchangeAuthorizationCode({
