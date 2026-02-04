@@ -50,7 +50,7 @@ The script will automatically:
 1. Check Docker environment
 2. Generate random passwords (JWT_SECRET, database password)
 3. Create docker-compose.yml and .env files
-4. Start all services (PostgreSQL + peta-core + Cloudflared)
+4. Start all services (PostgreSQL + peta-auth + peta-core + Cloudflared)
 5. Wait for health checks to pass
 6. Display access information
 
@@ -128,6 +128,19 @@ services:
     networks:
       - peta-network
 
+  # Peta Auth Service (used by peta-core)
+  peta-auth:
+    image: petaio/peta-auth:latest
+    container_name: peta-auth
+    restart: unless-stopped
+    # Expose this port only when running peta-core on the host machine
+    # ports:
+    #   - '7788:7788'
+    networks:
+      - peta-network
+    volumes:
+      - peta-auth-data:/data
+
   # Peta Core Service (MCP Gateway)
   peta-core:
     image: petaio/peta-core:latest
@@ -179,6 +192,8 @@ services:
 
 volumes:
   postgres_peta_core:
+    driver: local
+  peta-auth-data:
     driver: local
 
 networks:

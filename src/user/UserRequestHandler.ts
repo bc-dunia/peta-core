@@ -28,6 +28,7 @@ import {
 } from './types.js';
 import { AuthUtils } from '../utils/AuthUtils.js';
 import { exchangeAuthorizationCode } from '../mcp/oauth/exchange.js';
+import { PETA_AUTH_CONFIG } from '../config/petaAuthConfig.js';
 
 export class UserRequestHandler {
   private logger = createLogger('UserRequestHandler');
@@ -270,59 +271,66 @@ export class UserRequestHandler {
           if (oauth.clientId === oauthConfig.userClientId) {
             // user peta client id
             const keyLength = Math.ceil(userToken.length * 0.5);
-              const key = userToken.substring(keyLength) + serverId + true.toString();
-              const hashKey = await CryptoService.hash(key);
+            const key = userToken.substring(keyLength) + serverId + true.toString();
+            const hashKey = await CryptoService.hash(key);
 
-              // The following is a temporary processing process. This will not be the final solution. It is only for testing.
-              // ===================================================
-              const clientSecrets = process.env.PE_CLIENT_SECRETS;
-              if (!clientSecrets) {
-                throw new UserError('PE_CLIENT_SECRETS is not set', UserErrorCode.SERVER_CONFIG_INVALID);
-              }
-              const clientSecretsMap = JSON.parse(clientSecrets);
-              if (!clientSecretsMap[oauth.clientId]) {
-                throw new UserError('Invalid client id', UserErrorCode.SERVER_CONFIG_INVALID);
-              }
-              const values = clientSecretsMap[oauth.clientId];
-              const clientSecret = values?.clientSecret;
+            const requestBody: {
+              clientId: string;
+              provider: string;
+              key: string;
+              code: string;
+              redirectUri: string;
+              tokenUrl?: string;
+            } = {
+              clientId: oauth.clientId,
+              provider: provider,
+              key: hashKey,
+              code: oauthCode,
+              redirectUri: oauthRedirectUrl
+            };
 
-              if (!clientSecret) {
-                throw new UserError('Invalid client secret', UserErrorCode.SERVER_CONFIG_INVALID);
-              }
-              
-              try {
-                const exchangeResult = await exchangeAuthorizationCode({
-                  provider: provider,
-                  tokenUrl: oauthConfig.tokenUrl,
-                  clientId: oauth.clientId,
-                  clientSecret: clientSecret,
-                  code: oauthCode,
-                  redirectUri: oauthRedirectUrl
-                });
+            if ((provider === 'zendesk' || provider === 'canvas') && oauthConfig?.tokenUrl) {
+              requestBody.tokenUrl = oauthConfig.tokenUrl;
+            } else if (provider === 'zendesk' || provider === 'canvas') {
+              throw new UserError('Missing OAuth tokenUrl', UserErrorCode.SERVER_CONFIG_INVALID);
+            }
 
-                if (exchangeResult.accessToken && exchangeResult.refreshToken) {
-                  const expiresAt = exchangeResult.expiresAt ?? (Date.now() + 30 * 24 * 60 * 60 * 1000);
-                  decryptedLaunchConfigValue.oauth = {
-                    clientId: oauth.clientId,
-                    clientSecret: clientSecret,
-                    accessToken: exchangeResult.accessToken,
-                    refreshToken: exchangeResult.refreshToken,
-                    expiresAt: expiresAt
-                  };
-                  launchConfig = decryptedLaunchConfigValue;
-                } else {
-                  throw new UserError('Failed to exchange OAuth code', UserErrorCode.SERVER_CONFIG_INVALID);
-                }
-              } catch (error) {
-                this.logger.error({ err: error }, 'Error exchanging authorization code');
+            try {
+              const response = await fetch(`${PETA_AUTH_CONFIG.BASE_URL}/v1/oauth/exchange`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody),
+              });
+
+              const result = await response.json();
+              if (!response.ok || !result?.accessToken || !result?.expiresAt) {
+                this.logger.warn({
+                  status: response.status,
+                  provider,
+                  clientId: oauth.clientId.substring(0, 10) + '...' + oauth.clientId.substring(oauth.clientId.length - 10)
+                }, 'Peta OAuth exchange failed');
                 throw new UserError('Failed to exchange OAuth code', UserErrorCode.SERVER_CONFIG_INVALID);
               }
-              // ===================================================
 
-              this.logger.debug('User peta client id');
+              decryptedLaunchConfigValue.oauth = {
+                clientId: oauth.clientId,
+                key: hashKey,
+                accessToken: result.accessToken,
+                expiresAt: result.expiresAt
+              };
+              launchConfig = decryptedLaunchConfigValue;
 
-            // TODO: Implement this
-            // throw new UserError(`User peta client id`, UserErrorCode.SERVER_CONFIG_INVALID);
+              this.logger.info({
+                serverId,
+                provider,
+                clientId: oauth.clientId.substring(0, 10) + '...' + oauth.clientId.substring(oauth.clientId.length - 10)
+              }, 'Peta OAuth exchange succeeded');
+            } catch (error) {
+              this.logger.error({ err: error }, 'Error exchanging authorization code');
+              throw new UserError('Failed to exchange OAuth code', UserErrorCode.SERVER_CONFIG_INVALID);
+            }
           } else {
             try {
               const exchangeResult = await exchangeAuthorizationCode({

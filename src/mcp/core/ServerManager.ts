@@ -1022,17 +1022,17 @@ export class ServerManager {
     const usePetaOauthConfig = serverContext.serverEntity.usePetaOauthConfig;
 
     // For testing the temporary block
-    // if (usePetaOauthConfig && serverContext.serverEntity.authType !== ServerAuthType.ApiKey) {
-    //   const initialToken = await this.initializePetaAuth(serverContext, launchConfig, token);
-    //   this.injectOAuthTokenEnv(authType, launchConfig, initialToken);
-    //   delete launchConfig.oauth;
+    if (usePetaOauthConfig && serverContext.serverEntity.authType !== ServerAuthType.ApiKey) {
+      const initialToken = await this.initializePetaAuth(serverContext, launchConfig, token);
+      this.injectOAuthTokenEnv(authType, launchConfig, initialToken);
+      delete launchConfig.oauth;
 
-    //   this.logger.info({
-    //     serverName: serverContext.serverEntity.serverName,
-    //     usePetaOauthConfig
-    //   }, 'OAuth initialized with Peta config');
-    //   return;
-    // }
+      this.logger.info({
+        serverName: serverContext.serverEntity.serverName,
+        usePetaOauthConfig
+      }, 'OAuth initialized with Peta config');
+      return;
+    }
 
     switch (authType) {
       case ServerAuthType.GoogleAuth:
@@ -1116,6 +1116,7 @@ export class ServerManager {
       userToken: token,
       server: serverContext.serverEntity,
       clientId: launchConfig.oauth.clientId,
+      key: launchConfig.oauth.key,
       accessToken: launchConfig.oauth.accessToken,
       expiresAt: launchConfig.oauth.expiresAt
     });

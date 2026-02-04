@@ -19,6 +19,17 @@ services:
     networks:
       - peta-network
 
+  peta-auth:
+    image: petaio/peta-auth:latest
+    container_name: peta-auth
+    restart: unless-stopped
+    ports:
+      - '7788:7788'
+    networks:
+      - peta-network
+    volumes:
+      - peta-auth-data:/data
+
   # Peta Core service (uncomment when deploying)
   # peta-core:
   #   image: petaio/peta-core:latest
@@ -63,6 +74,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  peta-auth-data:
     driver: local
 
 networks:

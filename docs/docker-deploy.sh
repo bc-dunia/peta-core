@@ -4,7 +4,7 @@
 # Peta-Core One-Click Deployment Script
 # ====================================
 # This script deploys Peta-Core service from Docker image petaio/peta-core:latest
-# Including PostgreSQL, peta-core, and Cloudflared services
+# Including PostgreSQL, peta-auth, peta-core, and Cloudflared services
 
 set -e
 
@@ -222,6 +222,16 @@ services:
       retries: 3
       start_period: 40s
 
+  # Peta Auth Service
+  peta-auth:
+    image: petaio/peta-auth:latest
+    container_name: peta-auth
+    restart: unless-stopped
+    networks:
+      - peta-network
+    volumes:
+      - peta-auth-data:/data
+
   # Cloudflared Service
   # Note: restart is set to "no" to prevent auto-start on deployment
   # Cloudflared will be started via API when needed
@@ -239,6 +249,8 @@ services:
 
 volumes:
   ${VOLUME_NAME}:
+    driver: local
+  peta-auth-data:
     driver: local
 
 networks:
