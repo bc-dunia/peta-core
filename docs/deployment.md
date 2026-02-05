@@ -147,13 +147,23 @@ All configuration is set via environment variables (for example in a `.env` file
 
 #### Authentication
 
-| Name         | Required          | Default | Description                                         |
-| ------------ | ----------------- | ------- | --------------------------------------------------- |
-| `JWT_SECRET` | ✓ (in production) | –       | Secret used to sign and verify Peta service tokens. |
+| Name                  | Required          | Default | Description                                                                                              |
+| --------------------- | ----------------- | ------- | -------------------------------------------------------------------------------------------------------- |
+| `JWT_SECRET`          | ✓ (in production) | –       | Secret used to sign and verify Peta service tokens.                                                      |
+| `PETA_AUTH_AUTOSTART` |                   | `true`  | Auto-start peta-auth for Peta-managed OAuth credentials. Set to `false` to skip installing/starting it. |
 
 OAuth 2.0 and multi-tenant settings are also configured via environment variables; refer to `../.env.example` and the API docs for the full list.
 
 > For production deployments, treat `JWT_SECRET` and any vault-encryption related secrets as high-value keys: provision them from your secret manager or KMS, never check them into source control, and rotate them according to your organization’s security policies.
+
+#### Peta Auth (optional)
+
+Peta Core supports multiple OAuth-based integrations (for example Google, Notion, GitHub, and Figma). There are two ways to supply OAuth credentials:
+
+1. **Peta-managed credentials** (Peta provides `clientId` and `clientSecret`) — requires the separate `peta-auth` service so Peta secrets are never exposed.
+2. **Bring your own credentials** — no `peta-auth` service is required.
+
+If you are certain you will not use Peta-managed credentials, set `PETA_AUTH_AUTOSTART='false'` to skip installing and starting `peta-auth`.
 
 #### Logging
 
