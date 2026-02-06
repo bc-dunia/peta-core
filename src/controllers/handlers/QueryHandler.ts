@@ -85,25 +85,37 @@ export class QueryHandler {
   async handleGetServersCapabilities(request: AdminRequest<any>): Promise<{ capabilities: ServerConfigCapabilities }> {
     const { targetId } = request.data;
 
+    let capabilities: ServerConfigCapabilities
+    let serverName: string;
+    let serverId: string;
     const serverContext = ServerManager.instance.getServerContext(targetId);
-    if (!serverContext) {
+    if (serverContext) {
+      const serverCapabilities = serverContext.getMcpCapabilities();
+      capabilities = {
+        tools: serverCapabilities.tools ?? {},
+        resources: serverCapabilities.resources ?? {},
+        prompts: serverCapabilities.prompts ?? {}
+      }
+      serverName = serverContext.serverEntity.serverName;
+      serverId = serverContext.serverEntity.serverId;
+    } else {
       const serverEntity = await ServerRepository.findByServerId(targetId);
       if (!serverEntity) {
         throw new AdminError(`Server ${targetId} not found`, AdminErrorCode.SERVER_NOT_FOUND);
       }
-      const capabilities = JSON.parse(serverEntity.capabilities);
-      return {
-        capabilities: { tools: capabilities.tools ?? {}, resources: capabilities.resources ?? {}, prompts: capabilities.prompts ?? {} }
-      }
+      capabilities = JSON.parse(serverEntity.capabilities);
+      serverName = serverEntity.serverName;
+      serverId = serverEntity.serverId;
     }
 
-    const serverCapabilities = serverContext.getMcpCapabilities();
     this.logger.debug({
-      serverId: serverContext.serverEntity.serverId,
-      serverCapabilities
+      serverId: serverId,
+      serverName: serverName,
+      capabilities: capabilities
     }, 'Server capabilities retrieved');
+
     return {
-      capabilities: serverCapabilities
+      capabilities: capabilities
     };
   }
 }

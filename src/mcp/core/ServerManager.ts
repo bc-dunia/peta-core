@@ -121,7 +121,6 @@ export class ServerManager {
    */
   setOwnerToken(token: string): void {
     this.ownerToken = token;
-    this.logger.debug('Owner token cached');
   }
 
   /**
