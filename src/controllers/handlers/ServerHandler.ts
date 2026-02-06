@@ -463,6 +463,11 @@ export class ServerHandler {
     if (serverName !== undefined) updateData.serverName = serverName;
     if (launchConfig !== undefined) {
       updateData.launchConfig = typeof launchConfig === 'string' ? launchConfig : JSON.stringify(launchConfig);
+      if (updateData.launchConfig !== existingServer.launchConfig) {
+        if (!(existingServer.category === ServerCategory.Template && existingServer.allowUserInput === true && existingServer.authType === ServerAuthType.ApiKey)) {
+          throw new AdminError('This type of server does not allow modification of the launch configuration.', AdminErrorCode.INVALID_REQUEST);
+        }
+      }
     }
     if (isRestApiOrCustomRemote && configTemplate !== undefined && configTemplate !== null && configTemplate.trim() !== '' && configTemplate.trim() !== existingServer.configTemplate) {
       updateData.configTemplate = configTemplate;
