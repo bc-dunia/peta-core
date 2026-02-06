@@ -17,7 +17,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - peta-network
+      - peta-core-network
 
   peta-auth:
     image: petaio/peta-auth:latest
@@ -26,7 +26,7 @@ services:
     ports:
       - '7788:7788'
     networks:
-      - peta-network
+      - peta-core-network
     volumes:
       - peta-auth-data:/data
 
@@ -46,7 +46,7 @@ services:
   #     postgres:
   #       condition: service_healthy
   #   networks:
-  #     - peta-network
+  #     - peta-core-network
 
   # Skills MCP server (uncomment when deploying)
   # skillsmcp:
@@ -58,7 +58,7 @@ services:
   #   volumes:
   #     - ./skills:/app/skills:ro  # Read-only mount of same skills directory
   #   networks:
-  #     - peta-network
+  #     - peta-core-network
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -68,7 +68,7 @@ services:
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
     networks:
-      - peta-network
+      - peta-core-network
     volumes:
       - ./cloudflared:/etc/cloudflared
 
@@ -79,5 +79,5 @@ volumes:
     driver: local
 
 networks:
-  peta-network:
+  peta-core-network:
     driver: bridge
