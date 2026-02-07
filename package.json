@@ -27,14 +27,14 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.24.3",
-    "@prisma/client": "^6.13.0",
+    "@modelcontextprotocol/sdk": "^1.25.3",
+    "@prisma/client": "^6.17.1",
     "adm-zip": "^0.5.16",
     "bcryptjs": "^3.0.2",
     "chalk": "^5.3.0",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
-    "express": "^4.21.2",
+    "express": "^5.2.1",
     "gray-matter": "^4.0.3",
     "jsonwebtoken": "^9.0.2",
     "ora": "^8.1.1",
