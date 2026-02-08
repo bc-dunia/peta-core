@@ -24,6 +24,8 @@ export class ClientSession {
   capabilities?: ClientCapabilities;
   authContext: AuthContext;
   clientInfo?:  Implementation;
+  private sseConnected: boolean = false;
+  private lastSseDisconnectedAt?: Date | null;
   private lastUserInfoRefresh?: number;
   private proxySession?: ProxySession;
   // Logger for ClientSession
@@ -95,6 +97,31 @@ export class ClientSession {
     this.lastActive = new Date();
   }
 
+  markSseConnected(): void {
+    if (!this.sseConnected) {
+      this.sseConnected = true;
+      this.lastSseDisconnectedAt = null;
+      this.touch();
+      this.logger.debug('GET SSE connected');
+    }
+  }
+
+  markSseDisconnected(): void {
+    if (this.sseConnected) {
+      this.sseConnected = false;
+      this.lastSseDisconnectedAt = new Date();
+      this.logger.debug({ at: this.lastSseDisconnectedAt }, 'GET SSE disconnected');
+    }
+  }
+
+  isSseConnected(): boolean {
+    return this.sseConnected;
+  }
+
+  getLastSseDisconnectedAt(): Date | null {
+    return this.lastSseDisconnectedAt ?? null;
+  }
+
   isExpired(now?: Date, timeoutMinutes?: number): boolean {
     // Check if user authorization has expired
     if (this.authContext.expiresAt && Math.floor(Date.now() / 1000) > this.authContext.expiresAt) {
@@ -107,6 +134,18 @@ export class ClientSession {
     }
     
     return false;
+  }
+
+  isInactive(now: Date, timeoutMs: number): boolean {
+    if (this.isSseConnected()) {
+      return false;
+    }
+
+    const lastActiveMs = this.lastActive.getTime();
+    const lastSseDisconnectedMs = this.lastSseDisconnectedAt ? this.lastSseDisconnectedAt.getTime() : 0;
+    const effectiveLast = Math.max(lastActiveMs, lastSseDisconnectedMs);
+
+    return now.getTime() - effectiveLast > timeoutMs;
   }
 
   /**

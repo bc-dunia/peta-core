@@ -25,6 +25,7 @@ export class SessionStore {
   
   // Logger for SessionStore
   private logger = createLogger('SessionStore');
+  private static readonly SESSION_INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
 
   static instance: SessionStore = new SessionStore();
 
@@ -321,7 +322,7 @@ export class SessionStore {
    * Get active session count
    */
   getActiveSessionCount(): number {
-    return this.sessions.size;
+    return Array.from(this.sessions.values()).filter(session => session.isSseConnected()).length;
   }
 
   /**
@@ -367,11 +368,14 @@ export class SessionStore {
    */
   async cleanupExpiredSessions(): Promise<void> {
     const expiredSessions: string[] = [];
+    const inactiveSessions: string[] = [];
     const now = new Date();
 
     for (const [sessionId, session] of this.sessions.entries()) {
       if (session.isExpired()) {
         expiredSessions.push(sessionId);
+      } else if (session.isInactive(now, SessionStore.SESSION_INACTIVITY_TIMEOUT_MS)) {
+        inactiveSessions.push(sessionId);
       }
     }
 
@@ -380,8 +384,16 @@ export class SessionStore {
       await this.removeSession(sessionId, DisconnectReason.USER_EXPIRED, true);
     }
 
+    // Clean up inactive sessions
+    for (const sessionId of inactiveSessions) {
+      await this.removeSession(sessionId, DisconnectReason.SESSION_TIMEOUT, false);
+    }
+
     if (expiredSessions.length > 0) {
-      this.logger.info({ count: expiredSessions.length }, 'Cleaned up expired sessions');
+      this.logger.info({ expiredSessions: expiredSessions.join(', ')}, 'Cleaned up expired sessions');
+    }
+    if (inactiveSessions.length > 0) {
+      this.logger.info({ inactiveSessions: inactiveSessions.join(', ')}, 'Cleaned up inactive sessions');
     }
   }
 

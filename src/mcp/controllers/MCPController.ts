@@ -8,6 +8,7 @@ import { SessionStore } from '../core/SessionStore.js';
 import { AuthError, AuthErrorType } from '../../types/auth.types.js';
 import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { createLogger } from '../../logger/index.js';
+import type { ClientSession } from '../core/ClientSession.js';
 
 export class MCPController {
   
@@ -15,6 +16,45 @@ export class MCPController {
   private logger = createLogger('MCPController');
 
   constructor() {}
+
+  private trackGetSseConnection(clientSession: ClientSession | undefined, res: Response): void {
+    if (!clientSession) {
+      return;
+    }
+
+    let connected = false;
+
+    const markConnectedIfSse = () => {
+      if (connected || !res.headersSent) {
+        return;
+      }
+      const ctHeader = res.getHeader('Content-Type') ?? res.getHeader('content-type');
+      const ct = Array.isArray(ctHeader) ? ctHeader.join(';') : String(ctHeader ?? '');
+      if (res.statusCode >= 200 && res.statusCode < 300 && ct.includes('text/event-stream')) {
+        connected = true;
+        clientSession.markSseConnected();
+      }
+    };
+
+    const markDisconnected = () => {
+      if (connected) {
+        connected = false;
+        clientSession.markSseDisconnected();
+      }
+    };
+
+    const originalWriteHead = res.writeHead;
+    res.writeHead = ((...args: any[]) => {
+      const ret = originalWriteHead.apply(res, args as any);
+      markConnectedIfSse();
+      return ret;
+    }) as any;
+
+    res.on('close', markDisconnected);
+    res.on('finish', markDisconnected);
+
+    setImmediate(markConnectedIfSse);
+  }
 
   /**
    * POST /mcp - Handle MCP request
@@ -81,6 +121,8 @@ export class MCPController {
 
         return;
       }
+
+      this.trackGetSseConnection(clientSession, res);
 
       // Check Last-Event-ID header to support resumability
       const lastEventId = req.headers['last-event-id'] as string | undefined;
